@@ -1,3 +1,11 @@
+use std::path::Path;
+
+use seafrepo::*;
+
 fn main() {
-    println!("Hello, world!");
+    let path = Path::new("tests/data/testrepo/commits");
+
+    for c in CommitIterator::new(path) {
+        println!("{:?}", c);
+    }
 }
