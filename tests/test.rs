@@ -61,7 +61,7 @@ fn lookup_head_commit() {
         .populate()
         .unwrap();
     assert_eq!(
-        lib.head_commit.unwrap().to_string(),
+        lib.head_commit.unwrap().commit_id.to_string(),
         "038cac5ffc20b13a4fac8d21e60bf01d03f8a179"
     );
 }

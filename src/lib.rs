@@ -14,7 +14,7 @@ use walkdir::WalkDir;
 pub struct Library {
     pub repo_path: PathBuf,
     pub uuid: String,
-    pub head_commit: Option<Sha1>,
+    pub head_commit: Option<Commit>,
 }
 
 impl Library {
@@ -31,7 +31,7 @@ impl Library {
         let mut all_ids = HashSet::new();
         let mut parents = HashSet::new();
 
-        for c in CommitIterator::new(&self.obj_storage_path("commits")) {
+        for c in CommitIterator::new(&self.obj_type_path("commits")) {
             let c = c?;
 
             all_ids.insert(c.commit_id);
@@ -49,7 +49,9 @@ impl Library {
         match children.len() {
             0 => {}
             1 => {
-                self.head_commit = Some(children[0].to_owned());
+                let head_id = &children[0];
+                let head_commit = parse_commit(&self.obj_path("commits", head_id))?;
+                self.head_commit = Some(head_commit);
             }
             _ => {
                 return Err(SeafError::MultipleHeads);
@@ -59,8 +61,15 @@ impl Library {
         Ok(self)
     }
 
-    fn obj_storage_path(&self, ty: &str) -> PathBuf {
+    fn obj_type_path(&self, ty: &str) -> PathBuf {
         self.repo_path.join(ty).join(&self.uuid)
+    }
+
+    fn obj_path(&self, ty: &str, id: &Sha1) -> PathBuf {
+        let id_str = id.to_string();
+        self.obj_type_path(ty)
+            .join(&id_str[0..2])
+            .join(&id_str[2..])
     }
 }
 
