@@ -1,11 +1,12 @@
-use serde::{Deserialize, Serialize};
+use flate2::read::ZlibDecoder;
+use serde::Deserialize;
 use std::{
-    fs::File,
+    fs,
     path::{Path, PathBuf},
 };
 use walkdir::WalkDir;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct Commit {
     pub commit_id: String,
     pub root_id: String,
@@ -24,7 +25,7 @@ pub struct Commit {
 }
 
 pub fn parse_commit(filename: &Path) -> Result<Commit, SeafError> {
-    let f = File::open(filename)?;
+    let f = fs::File::open(filename)?;
     let c: Commit =
         serde_json::from_reader(f).map_err(|e| SeafError::ParseJson(filename.to_owned(), e))?;
     Ok(c)
@@ -61,6 +62,66 @@ impl Iterator for CommitIterator {
         }
         None
     }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct File {
+    pub block_ids: Vec<String>,
+    pub size: u64,
+    #[serde(rename(deserialize = "type"))]
+    pub ty: u32,
+    pub version: u32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Dir {
+    pub dirents: Vec<Dirent>,
+    #[serde(rename(deserialize = "type"))]
+    pub ty: u32,
+    pub version: u32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Dirent {
+    pub id: String,
+    pub mode: u32,
+    pub modifier: String,
+    pub mtime: u64,
+    pub name: String,
+    pub size: u64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum Fs {
+    File(File),
+    Dir(Dir),
+}
+
+impl Fs {
+    pub fn unwrap_file(self) -> File {
+        if let Fs::File(f) = self {
+            f
+        } else {
+            panic!("Expected File, have {:?}", self);
+        }
+    }
+
+    pub fn unwrap_dir(self) -> Dir {
+        if let Fs::Dir(d) = self {
+            d
+        } else {
+            panic!("Expected Dir, have {:?}", self);
+        }
+    }
+}
+
+pub fn parse_fs(filename: &Path) -> Result<Fs, SeafError> {
+    let f = fs::File::open(filename)?;
+    let dec = ZlibDecoder::new(f);
+    let fs: Fs =
+        serde_json::from_reader(dec).map_err(|e| SeafError::ParseJson(filename.to_owned(), e))?;
+    Ok(fs)
 }
 
 #[derive(Debug)]
