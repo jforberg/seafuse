@@ -6,7 +6,11 @@ const TEST_REPO_UUID: &str = "868be3a7-b357-4189-af52-304b402d9904";
 
 #[test]
 fn parse_example_commit() {
-    let c = parse_commit(&path_to("commits", "038cac5ffc20b13a4fac8d21e60bf01d03f8a179")).unwrap();
+    let c = parse_commit(&path_to(
+        "commits",
+        "038cac5ffc20b13a4fac8d21e60bf01d03f8a179",
+    ))
+    .unwrap();
     assert_eq!(c.commit_id, "038cac5ffc20b13a4fac8d21e60bf01d03f8a179");
 }
 
@@ -44,6 +48,17 @@ fn parse_example_fs_dir() {
         .unwrap()
         .unwrap_dir();
     assert_eq!(d.dirents[0].id, "e40b894880747010bf6ec384b83e578f352beed7");
+}
+
+#[test]
+fn lookup_head_commit() {
+    let lib = Library::new(Path::new(TEST_REPO_PATH), TEST_REPO_UUID)
+        .populate()
+        .unwrap();
+    assert_eq!(
+        lib.head_commit.unwrap(),
+        "038cac5ffc20b13a4fac8d21e60bf01d03f8a179"
+    );
 }
 
 fn path_to(ty: &str, uuid: &str) -> PathBuf {

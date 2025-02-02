@@ -1,10 +1,65 @@
 use flate2::read::ZlibDecoder;
 use serde::Deserialize;
 use std::{
+    collections::HashSet,
     fs,
     path::{Path, PathBuf},
 };
 use walkdir::WalkDir;
+
+#[derive(Debug)]
+pub struct Library {
+    pub repo_path: PathBuf,
+    pub uuid: String,
+    pub head_commit: Option<String>,
+}
+
+impl Library {
+    pub fn new(repo_path: &Path, uuid: &str) -> Library {
+        Library {
+            repo_path: repo_path.to_owned(),
+            uuid: uuid.to_owned(),
+            head_commit: None,
+        }
+    }
+
+    pub fn populate(mut self) -> Result<Library, SeafError> {
+        // Find the HEAD commit(s). TODO improve this
+        let mut all_ids = HashSet::new();
+        let mut parents = HashSet::new();
+
+        for c in CommitIterator::new(&self.obj_storage_path("commits")) {
+            let c = c?;
+
+            all_ids.insert(c.commit_id.clone());
+
+            if let Some(pid) = c.parent_id {
+                parents.insert(pid.clone());
+            }
+
+            if let Some(pid) = c.second_parent_id {
+                parents.insert(pid.clone());
+            }
+        }
+
+        let children: Vec<&String> = all_ids.difference(&parents).collect();
+        match children.len() {
+            0 => {}
+            1 => {
+                self.head_commit = Some(children[0].to_owned());
+            }
+            _ => {
+                return Err(SeafError::MultipleHeads);
+            }
+        }
+
+        Ok(self)
+    }
+
+    fn obj_storage_path(&self, ty: &str) -> PathBuf {
+        self.repo_path.join(ty).join(&self.uuid)
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct Commit {
@@ -130,6 +185,7 @@ pub enum SeafError {
     ParseJson(PathBuf, serde_json::Error),
     WalkDir(walkdir::Error),
     NotImpl,
+    MultipleHeads,
 }
 
 impl From<std::io::Error> for SeafError {
