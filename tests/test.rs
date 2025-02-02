@@ -11,14 +11,17 @@ fn parse_example_commit() {
         "038cac5ffc20b13a4fac8d21e60bf01d03f8a179",
     ))
     .unwrap();
-    assert_eq!(c.commit_id, "038cac5ffc20b13a4fac8d21e60bf01d03f8a179");
+    assert_eq!(
+        c.commit_id.to_string(),
+        "038cac5ffc20b13a4fac8d21e60bf01d03f8a179"
+    );
 }
 
 #[test]
 fn find_and_parse_commits() {
     let p = Path::new(TEST_REPO_PATH).join("commits");
     let ids: Vec<String> = CommitIterator::new(&p)
-        .map(|c| c.unwrap().commit_id)
+        .map(|c| c.unwrap().commit_id.to_string())
         .collect();
 
     assert_eq!(
@@ -36,10 +39,9 @@ fn parse_example_fs_file() {
     let f = parse_fs(&path_to("fs", "e40b894880747010bf6ec384b83e578f352beed7"))
         .unwrap()
         .unwrap_file();
-    assert_eq!(
-        f.block_ids,
-        vec!["5516c9472d25947faae16a94ee25ed8054978c85"]
-    );
+
+    let ids: Vec<_> = f.block_ids.into_iter().map(|s| s.to_string()).collect();
+    assert_eq!(ids, vec!["5516c9472d25947faae16a94ee25ed8054978c85"]);
 }
 
 #[test]
@@ -47,7 +49,10 @@ fn parse_example_fs_dir() {
     let d = parse_fs(&path_to("fs", "ebd03d7c735be353d1c6d302e1092e69b5c5d041"))
         .unwrap()
         .unwrap_dir();
-    assert_eq!(d.dirents[0].id, "e40b894880747010bf6ec384b83e578f352beed7");
+    assert_eq!(
+        d.dirents[0].id.to_string(),
+        "e40b894880747010bf6ec384b83e578f352beed7"
+    );
 }
 
 #[test]
@@ -56,9 +61,23 @@ fn lookup_head_commit() {
         .populate()
         .unwrap();
     assert_eq!(
-        lib.head_commit.unwrap(),
+        lib.head_commit.unwrap().to_string(),
         "038cac5ffc20b13a4fac8d21e60bf01d03f8a179"
     );
+}
+
+#[test]
+fn sha1_roundtrip() {
+    let raw = "e40b894880747010bf6ec384b83e578f352beed7";
+    let sha1 = Sha1::parse(raw).unwrap();
+    println!("{:?}", sha1);
+    assert_eq!(sha1.to_string(), raw);
+}
+
+#[test]
+fn sha1_malformed() {
+    assert_eq!(Sha1::parse("1234"), None);
+    assert_eq!(Sha1::parse("thisisnosha1"), None);
 }
 
 fn path_to(ty: &str, uuid: &str) -> PathBuf {
