@@ -125,7 +125,10 @@ fn read_file_having_single_block() {
     let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
     let mut bytes = vec![];
 
-    lib.open_file(id).unwrap().read_to_end(&mut bytes).unwrap();
+    lib.open_file_by_id(id)
+        .unwrap()
+        .read_to_end(&mut bytes)
+        .unwrap();
 
     assert_eq!(&bytes, b"# test\n\ntest\n");
 }
@@ -135,7 +138,7 @@ fn open_nonexistent_file() {
     let lib = open_test_lib();
     let id = Sha1::parse("0000000000000000000000000000000000000000").unwrap();
 
-    match lib.open_file(id) {
+    match lib.open_file_by_id(id) {
         Err(SeafError::IO(e)) => assert_eq!(e.kind(), io::ErrorKind::NotFound),
         _ => unreachable!(),
     };

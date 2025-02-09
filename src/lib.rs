@@ -66,9 +66,17 @@ impl Library {
         self.repo_path.join(ty).join(&self.uuid)
     }
 
-    pub fn open_file(&self, id: Sha1) -> Result<FileReader, SeafError> {
+    pub fn open_file(&self, file: &File) -> FileReader {
+        self.open_file_from_blocks(&file.block_ids)
+    }
+
+    pub fn open_file_by_id(&self, id: Sha1) -> Result<FileReader, SeafError> {
         let file = self.load_fs(id)?.try_file()?;
-        Ok(FileReader::new(self.obj_type_path("blocks"), &file))
+        Ok(self.open_file_from_blocks(&file.block_ids))
+    }
+
+    pub fn open_file_from_blocks(&self, block_ids: &[Sha1]) -> FileReader {
+        FileReader::new(self.obj_type_path("blocks"), block_ids)
     }
 }
 
@@ -266,7 +274,7 @@ impl Fs {
         }
     }
 
-    pub fn type_name(self) -> &'static str {
+    pub fn type_name(&self) -> &'static str {
         match self {
             Fs::Dir(_) => "Dir",
             Fs::File(_) => "File",
@@ -290,15 +298,17 @@ pub struct FileReader {
 }
 
 impl FileReader {
-    pub fn new(block_path: PathBuf, file: &File) -> FileReader {
+    pub fn new(block_path: PathBuf, block_ids: &[Sha1]) -> FileReader {
         let mut fr = FileReader {
             block_path,
             block_ids: vec![],
             cur_file: None,
         };
-        for b in file.block_ids.iter().rev() {
+
+        for b in block_ids.iter().rev() {
             fr.block_ids.push(*b);
         }
+
         fr
     }
 }
