@@ -39,8 +39,13 @@ fn main() {
         println!("Last modified: {}, by {}", head.ctime, head.creator_name);
     }
 
+    let mut file_counter = 0;
+    let mut dir_counter = 0;
+
+    fs::create_dir_all(&args.target).expect("Failed to create target directory");
+
     for r in lib.walk_fs() {
-        let (p, de, fs) = r.expect("get next fs entry");
+        let (p, de, fs) = r.expect("Failed to get fs entry");
 
         let full_parent = args.target.join(p);
         let full_path = full_parent.join(&de.name);
@@ -53,22 +58,29 @@ fn main() {
             continue;
         }
 
-        fs::create_dir_all(&full_parent).expect("create parent directories");
         match fs {
             Fs::Dir(_) => {
-                match fs::create_dir(de.name) {
-                    Ok(()) => (),
-                    Err(e) if e.kind() == io::ErrorKind::AlreadyExists => (),
-                    e => e.expect("create new directory"),
-                };
+                fs::create_dir(&full_path).unwrap_or_else(|e| {
+                    panic!("Failed to create new directory {:?}: {:?}", &full_path, e)
+                });
+
+                dir_counter += 1;
             }
             Fs::File(f) => {
-                let mut w =
-                    fs::File::create_new(full_parent.join(&de.name)).expect("create new file");
+                let path = full_parent.join(&de.name);
+                let mut w = fs::File::create_new(&path)
+                    .unwrap_or_else(|e| panic!("Failed to create new file {:?}: {:?}", &path, e));
                 let mut r = lib.open_file(&f);
 
-                io::copy(&mut r, &mut w).expect("copy data to new file");
+                io::copy(&mut r, &mut w).expect("Failed to copy data to new file");
+
+                file_counter += 1;
             }
         }
     }
+
+    println!(
+        "Extracted {} directories, {} files",
+        dir_counter, file_counter
+    );
 }
