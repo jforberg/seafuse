@@ -5,6 +5,7 @@ use std::{
     fmt::Debug,
     fmt::Display,
     fs,
+    io::Read,
     path::{Path, PathBuf},
 };
 use walkdir::WalkDir;
@@ -58,15 +59,22 @@ impl Library {
     }
 
     fn obj_path(&self, ty: &str, id: Sha1) -> PathBuf {
-        let id_str = id.to_string();
-        self.obj_type_path(ty)
-            .join(&id_str[0..2])
-            .join(&id_str[2..])
+        full_obj_path(&self.obj_type_path(ty), id)
     }
 
     fn obj_type_path(&self, ty: &str) -> PathBuf {
         self.repo_path.join(ty).join(&self.uuid)
     }
+
+    pub fn open_file(&self, id: Sha1) -> Result<FileReader, SeafError> {
+        let file = self.load_fs(id)?.try_file()?;
+        Ok(FileReader::new(self.obj_type_path("blocks"), &file))
+    }
+}
+
+fn full_obj_path(obj_type_path: &Path, id: Sha1) -> PathBuf {
+    let id_str = id.to_string();
+    obj_type_path.join(&id_str[0..2]).join(&id_str[2..])
 }
 
 #[derive(Debug)]
@@ -217,18 +225,24 @@ pub enum Fs {
 
 impl Fs {
     pub fn unwrap_file(self) -> File {
-        if let Fs::File(f) = self {
-            f
-        } else {
-            panic!("Expected File, have {:?}", self);
-        }
+        self.try_file().unwrap()
     }
 
     pub fn unwrap_dir(self) -> Dir {
-        if let Fs::Dir(d) = self {
-            d
-        } else {
-            panic!("Expected Dir, have {:?}", self);
+        self.try_dir().unwrap()
+    }
+
+    pub fn try_file(self) -> Result<File, SeafError> {
+        match self {
+            Fs::File(f) => Ok(f),
+            _ => Err(SeafError::WrongFsType),
+        }
+    }
+
+    pub fn try_dir(self) -> Result<Dir, SeafError> {
+        match self {
+            Fs::Dir(d) => Ok(d),
+            _ => Err(SeafError::WrongFsType),
         }
     }
 }
@@ -239,6 +253,53 @@ pub fn parse_fs(filename: &Path) -> Result<Fs, SeafError> {
     let fs: Fs =
         serde_json::from_reader(dec).map_err(|e| SeafError::ParseJson(filename.to_owned(), e))?;
     Ok(fs)
+}
+
+#[derive(Debug)]
+pub struct FileReader {
+    block_path: PathBuf,
+    block_ids: Vec<Sha1>,
+    cur_file: Option<fs::File>,
+}
+
+impl FileReader {
+    pub fn new(block_path: PathBuf, file: &File) -> FileReader {
+        let mut fr = FileReader {
+            block_path,
+            block_ids: vec![],
+            cur_file: None,
+        };
+        for b in file.block_ids.iter().rev() {
+            fr.block_ids.push(*b);
+        }
+        fr
+    }
+}
+
+impl Read for FileReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        // We need a file to read. Either we are in the middle of reading some block, or we open
+        // the next block
+        let file = match self.cur_file {
+            Some(ref mut f) => f,
+            None => match self.block_ids.pop() {
+                None => return Ok(0),
+                Some(bid) => {
+                    let path = full_obj_path(&self.block_path, bid);
+                    let file = fs::File::open(path)?;
+                    self.cur_file.insert(file)
+                }
+            },
+        };
+
+        let n = file.read(buf)?;
+        if n > 0 {
+            return Ok(n);
+        }
+
+        self.cur_file = None;
+        self.read(buf)
+    }
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -297,6 +358,7 @@ pub enum SeafError {
     WalkDir(walkdir::Error),
     NotImpl,
     NoHeadCommit,
+    WrongFsType,
 }
 
 impl From<std::io::Error> for SeafError {

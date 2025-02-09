@@ -1,5 +1,7 @@
 use seafrepo::*;
 use std::collections::HashSet;
+use std::io;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 const TEST_REPO_PATH: &str = "tests/data/testrepo/";
@@ -11,6 +13,12 @@ fn path_to(ty: &str, uuid: &str) -> PathBuf {
         .join(TEST_REPO_UUID)
         .join(&uuid[..2])
         .join(&uuid[2..])
+}
+
+fn open_test_lib() -> Library {
+    Library::new(Path::new(TEST_REPO_PATH), TEST_REPO_UUID)
+        .populate()
+        .unwrap()
 }
 
 #[test]
@@ -107,4 +115,26 @@ fn walk_lib_fs() {
         file_names,
         HashSet::from_iter(["test.md", "test2.md"].into_iter().map(String::from))
     );
+}
+
+#[test]
+fn read_file_having_single_block() {
+    let lib = open_test_lib();
+    let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
+    let mut bytes = vec![];
+
+    lib.open_file(id).unwrap().read_to_end(&mut bytes).unwrap();
+
+    assert_eq!(&bytes, b"# test\n\ntest\n");
+}
+
+#[test]
+fn open_nonexistent_file() {
+    let lib = open_test_lib();
+    let id = Sha1::parse("0000000000000000000000000000000000000000").unwrap();
+
+    match lib.open_file(id) {
+        Err(SeafError::IO(e)) => assert_eq!(e.kind(), io::ErrorKind::NotFound),
+        _ => unreachable!(),
+    };
 }
