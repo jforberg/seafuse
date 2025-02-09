@@ -28,8 +28,8 @@ impl Library {
 
     pub fn populate(mut self) -> Result<Library, SeafError> {
         // Find the HEAD commit(s). TODO improve this
-        let mut all_ids = HashSet::new();
-        let mut parents = HashSet::new();
+        let mut all_ids: HashSet<Sha1> = HashSet::new();
+        let mut parents: HashSet<Sha1> = HashSet::new();
 
         for c in CommitIterator::new(&self.obj_type_path("commits")) {
             let c = c?;
@@ -45,11 +45,11 @@ impl Library {
             }
         }
 
-        let children: Vec<&Sha1> = all_ids.difference(&parents).collect();
+        let children: Vec<Sha1> = all_ids.difference(&parents).copied().collect();
         match children.len() {
             0 => {}
             1 => {
-                let head_id = &children[0];
+                let head_id = children[0];
                 let head_commit = parse_commit(&self.obj_path("commits", head_id))?;
                 self.head_commit = Some(head_commit);
             }
@@ -61,15 +61,79 @@ impl Library {
         Ok(self)
     }
 
-    fn obj_type_path(&self, ty: &str) -> PathBuf {
-        self.repo_path.join(ty).join(&self.uuid)
+    pub fn load_fs(&self, id: Sha1) -> Result<Fs, SeafError> {
+        parse_fs(&self.obj_path("fs", id))
     }
 
-    fn obj_path(&self, ty: &str, id: &Sha1) -> PathBuf {
+    pub fn walk_fs(&self) -> FsIterator {
+        FsIterator::new(self)
+    }
+
+    fn obj_path(&self, ty: &str, id: Sha1) -> PathBuf {
         let id_str = id.to_string();
         self.obj_type_path(ty)
             .join(&id_str[0..2])
             .join(&id_str[2..])
+    }
+
+    fn obj_type_path(&self, ty: &str) -> PathBuf {
+        self.repo_path.join(ty).join(&self.uuid)
+    }
+}
+
+#[derive(Debug)]
+pub struct FsIterator<'a> {
+    lib: &'a Library,
+    state: FsIteratorState,
+}
+
+#[derive(Debug)]
+enum FsIteratorState {
+    Root(Sha1),
+    Stack(Vec<Dir>),
+}
+
+impl FsIterator<'_> {
+    pub fn new(lib: &Library) -> FsIterator<'_> {
+        FsIterator {
+            lib,
+            state: FsIteratorState::Root(lib.head_commit.as_ref().unwrap().root_id),
+        }
+    }
+
+    fn next_result(&mut self) -> Result<Option<(Dirent, Fs)>, SeafError> {
+        if let FsIteratorState::Root(id) = self.state {
+            let d = self.lib.load_fs(id)?.unwrap_dir();
+            self.state = FsIteratorState::Stack(vec![d]);
+        }
+
+        let stack: &mut Vec<Dir> = match self.state {
+            FsIteratorState::Stack(ref mut v) => v,
+            _ => unreachable!(),
+        };
+
+        while !stack.is_empty() {
+            if let Some(de) = stack.last_mut().unwrap().dirents.pop() {
+                let fs = self.lib.load_fs(de.id)?;
+                if let Fs::Dir(ref d) = fs {
+                    stack.push(d.clone());
+                }
+
+                return Ok(Some((de, fs)));
+            }
+
+            stack.pop();
+        }
+
+        Ok(None)
+    }
+}
+
+impl Iterator for FsIterator<'_> {
+    type Item = Result<(Dirent, Fs), SeafError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.next_result().transpose()
     }
 }
 
@@ -131,7 +195,7 @@ impl Iterator for CommitIterator {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct File {
     pub block_ids: Vec<Sha1>,
     pub size: u64,
@@ -140,7 +204,7 @@ pub struct File {
     pub version: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Dir {
     pub dirents: Vec<Dirent>,
     #[serde(rename(deserialize = "type"))]
@@ -148,17 +212,15 @@ pub struct Dir {
     pub version: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Dirent {
     pub id: Sha1,
     pub mode: u32,
-    pub modifier: String,
     pub mtime: u64,
     pub name: String,
-    pub size: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum Fs {
     File(File),

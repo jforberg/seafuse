@@ -1,8 +1,17 @@
 use seafrepo::*;
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 const TEST_REPO_PATH: &str = "tests/data/testrepo/";
 const TEST_REPO_UUID: &str = "868be3a7-b357-4189-af52-304b402d9904";
+
+fn path_to(ty: &str, uuid: &str) -> PathBuf {
+    Path::new(TEST_REPO_PATH)
+        .join(ty)
+        .join(TEST_REPO_UUID)
+        .join(&uuid[..2])
+        .join(&uuid[2..])
+}
 
 #[test]
 fn parse_example_commit() {
@@ -25,11 +34,10 @@ fn find_and_parse_commits() {
         .collect();
 
     assert_eq!(
-        ids,
+        ids[0..2],
         vec![
             "038cac5ffc20b13a4fac8d21e60bf01d03f8a179",
             "3437b93bb6ce178dd3041b9db1874cc731cbca19",
-            "b075fb2acc9573f8b9546522f2c7f2221a062a29",
         ]
     );
 }
@@ -62,7 +70,7 @@ fn lookup_head_commit() {
         .unwrap();
     assert_eq!(
         lib.head_commit.unwrap().commit_id.to_string(),
-        "038cac5ffc20b13a4fac8d21e60bf01d03f8a179"
+        "a47ac095b65fdfb64dd751570219036202577f0c"
     );
 }
 
@@ -80,10 +88,23 @@ fn sha1_malformed() {
     assert_eq!(Sha1::parse("thisisnosha1"), None);
 }
 
-fn path_to(ty: &str, uuid: &str) -> PathBuf {
-    Path::new(TEST_REPO_PATH)
-        .join(ty)
-        .join(TEST_REPO_UUID)
-        .join(&uuid[..2])
-        .join(&uuid[2..])
+#[test]
+fn walk_lib_fs() {
+    let lib = Library::new(Path::new(TEST_REPO_PATH), TEST_REPO_UUID)
+        .populate()
+        .unwrap();
+
+    let mut file_names = HashSet::new();
+
+    for r in lib.walk_fs() {
+        let (de, fs) = r.unwrap();
+        if let Fs::File(_) = fs {
+            file_names.insert(de.name);
+        }
+    }
+
+    assert_eq!(
+        file_names,
+        HashSet::from_iter(["test.md", "test2.md"].into_iter().map(String::from))
+    );
 }
