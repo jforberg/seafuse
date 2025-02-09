@@ -80,45 +80,65 @@ fn full_obj_path(obj_type_path: &Path, id: Sha1) -> PathBuf {
 #[derive(Debug)]
 pub struct FsIterator<'a> {
     lib: &'a Library,
-    state: FsIteratorState,
+    state: FsItState,
 }
 
 #[derive(Debug)]
-enum FsIteratorState {
+enum FsItState {
     Root(Sha1),
-    Stack(Vec<Dir>),
+    NotRoot(FsItNrState),
+}
+
+#[derive(Debug)]
+struct FsItNrState {
+    stack: Vec<Dir>,
+    path: PathBuf,
 }
 
 impl FsIterator<'_> {
     pub fn new(lib: &Library) -> FsIterator<'_> {
+        let root_id = lib.head_commit.as_ref().unwrap().root_id;
+
         FsIterator {
             lib,
-            state: FsIteratorState::Root(lib.head_commit.as_ref().unwrap().root_id),
+            state: FsItState::Root(root_id),
         }
     }
 
-    fn next_result(&mut self) -> Result<Option<(Dirent, Fs)>, SeafError> {
-        if let FsIteratorState::Root(id) = self.state {
-            let d = self.lib.load_fs(id)?.unwrap_dir();
-            self.state = FsIteratorState::Stack(vec![d]);
-        }
+    fn next_result(&mut self) -> Result<Option<(PathBuf, Dirent, Fs)>, SeafError> {
+        // TODO Too much copying is going on here, optimise
+        let nr_state = match &mut self.state {
+            FsItState::Root(root_id) => {
+                let d = self.lib.load_fs(*root_id)?.unwrap_dir();
 
-        let stack: &mut Vec<Dir> = match self.state {
-            FsIteratorState::Stack(ref mut v) => v,
-            _ => unreachable!(),
+                self.state = FsItState::NotRoot(FsItNrState {
+                    stack: vec![d],
+                    path: "".into(),
+                });
+
+                match &mut self.state {
+                    FsItState::NotRoot(ref mut nr_state) => nr_state,
+                    _ => unreachable!(),
+                }
+            }
+            FsItState::NotRoot(ref mut nr_state) => nr_state,
         };
 
-        while !stack.is_empty() {
-            if let Some(de) = stack.last_mut().unwrap().dirents.pop() {
+        while !nr_state.stack.is_empty() {
+            if let Some(de) = nr_state.stack.last_mut().unwrap().dirents.pop() {
                 let fs = self.lib.load_fs(de.id)?;
+                let path_before = nr_state.path.clone();
+
                 if let Fs::Dir(ref d) = fs {
-                    stack.push(d.clone());
+                    nr_state.stack.push(d.clone());
+                    nr_state.path.push(&de.name);
                 }
 
-                return Ok(Some((de, fs)));
+                return Ok(Some((path_before, de, fs)));
             }
 
-            stack.pop();
+            nr_state.stack.pop();
+            nr_state.path.pop();
         }
 
         Ok(None)
@@ -126,7 +146,7 @@ impl FsIterator<'_> {
 }
 
 impl Iterator for FsIterator<'_> {
-    type Item = Result<(Dirent, Fs), SeafError>;
+    type Item = Result<(PathBuf, Dirent, Fs), SeafError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_result().transpose()
@@ -243,6 +263,13 @@ impl Fs {
         match self {
             Fs::Dir(d) => Ok(d),
             _ => Err(SeafError::WrongFsType),
+        }
+    }
+
+    pub fn type_name(self) -> &'static str {
+        match self {
+            Fs::Dir(_) => "Dir",
+            Fs::File(_) => "File",
         }
     }
 }

@@ -105,15 +105,17 @@ fn walk_lib_fs() {
     let mut file_names = HashSet::new();
 
     for r in lib.walk_fs() {
-        let (de, fs) = r.unwrap();
-        if let Fs::File(_) = fs {
-            file_names.insert(de.name);
-        }
+        let (p, de, _fs) = r.unwrap();
+        file_names.insert(p.join(de.name));
     }
 
     assert_eq!(
         file_names,
-        HashSet::from_iter(["test.md", "test2.md"].into_iter().map(String::from))
+        HashSet::from_iter(
+            ["test.md", "somedir", "somedir/test2.md"]
+                .into_iter()
+                .map(PathBuf::from)
+        )
     );
 }
 
