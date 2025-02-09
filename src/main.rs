@@ -14,7 +14,7 @@ fn main() {
     println!("Last modified: {}, by {}", head.ctime, head.creator_name);
 
     for r in lib.walk_fs() {
-        let (de, _fs) = r.unwrap();
-        println!("{}", de.name);
+        let (de, fs) = r.unwrap();
+        println!("{} - {:?}", de.name, fs);
     }
 }

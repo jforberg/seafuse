@@ -1,7 +1,6 @@
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Deserializer};
 use std::{
-    collections::HashSet,
     fmt,
     fmt::Debug,
     fmt::Display,
@@ -27,35 +26,24 @@ impl Library {
     }
 
     pub fn populate(mut self) -> Result<Library, SeafError> {
-        // Find the HEAD commit(s). TODO improve this
-        let mut all_ids: HashSet<Sha1> = HashSet::new();
-        let mut parents: HashSet<Sha1> = HashSet::new();
+        let mut head_commit: Option<Commit> = None;
 
+        // The head commit is assumed to be the most recent commit
         for c in CommitIterator::new(&self.obj_type_path("commits")) {
             let c = c?;
 
-            all_ids.insert(c.commit_id);
-
-            if let Some(pid) = c.parent_id {
-                parents.insert(pid);
-            }
-
-            if let Some(pid) = c.second_parent_id {
-                parents.insert(pid);
+            if let Some(ref hc) = head_commit {
+                if c.ctime > hc.ctime {
+                    head_commit = Some(c);
+                }
+            } else {
+                head_commit = Some(c);
             }
         }
 
-        let children: Vec<Sha1> = all_ids.difference(&parents).copied().collect();
-        match children.len() {
-            0 => {}
-            1 => {
-                let head_id = children[0];
-                let head_commit = parse_commit(&self.obj_path("commits", head_id))?;
-                self.head_commit = Some(head_commit);
-            }
-            _ => {
-                return Err(SeafError::MultipleHeads);
-            }
+        self.head_commit = head_commit;
+        if self.head_commit.is_none() {
+            return Err(SeafError::NoHeadCommit);
         }
 
         Ok(self)
@@ -308,7 +296,7 @@ pub enum SeafError {
     ParseJson(PathBuf, serde_json::Error),
     WalkDir(walkdir::Error),
     NotImpl,
-    MultipleHeads,
+    NoHeadCommit,
 }
 
 impl From<std::io::Error> for SeafError {
