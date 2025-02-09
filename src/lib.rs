@@ -10,7 +10,7 @@ use std::{
 };
 use walkdir::WalkDir;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Library {
     pub repo_path: PathBuf,
     pub uuid: String,
@@ -161,7 +161,7 @@ impl Iterator for FsIterator<'_> {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Commit {
     pub commit_id: Sha1,
     pub root_id: Sha1,

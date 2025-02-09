@@ -5,8 +5,14 @@ use std::path::PathBuf;
 
 use seafrepo::*;
 
+use crate::seaffuse::*;
+
+mod seaffuse;
+
 #[derive(clap::Parser, Debug)]
 struct Args {
+    op: Op,
+
     source: PathBuf,
 
     uuid: String,
@@ -18,6 +24,12 @@ struct Args {
 
     #[arg(short = 'v', long, default_value_t = false)]
     verbose: bool,
+}
+
+#[derive(Debug, Clone, clap::ValueEnum)]
+enum Op {
+    Extract,
+    Mount,
 }
 
 fn main() {
@@ -39,6 +51,13 @@ fn main() {
         println!("Last modified: {}, by {}", head.ctime, head.creator_name);
     }
 
+    match args.op {
+        Op::Extract => do_extract(&args, &lib),
+        Op::Mount => do_mount(&args, &lib),
+    };
+}
+
+fn do_extract(args: &Args, lib: &Library) {
     let mut file_counter = 0;
     let mut dir_counter = 0;
 
@@ -79,8 +98,17 @@ fn main() {
         }
     }
 
-    println!(
-        "Extracted {} directories, {} files",
-        dir_counter, file_counter
-    );
+    if args.verbose {
+        println!(
+            "Extracted {} directories, {} files",
+            dir_counter, file_counter
+        );
+    }
+}
+
+fn do_mount(args: &Args, lib: &Library) {
+    let fs = SeafFuse::new(lib.clone(), args.verbose);
+
+    fuser::mount2(fs, &args.target, &[])
+        .unwrap_or_else(|e| panic!("Failed to mount {:?}: {:?}", &args.target, e));
 }
