@@ -129,8 +129,9 @@ fn read_file_having_single_block() {
     let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
     let mut bytes = vec![];
 
-    lib.file_reader_from_id(id)
+    lib.file_by_id(id)
         .unwrap()
+        .to_reader()
         .read_to_end(&mut bytes)
         .unwrap();
 
@@ -143,8 +144,9 @@ fn read_file_having_multiple_blocks() {
     let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
     let mut bytes = vec![];
 
-    lib.file_reader_from_id(id)
+    lib.file_by_id(id)
         .unwrap()
+        .to_reader()
         .read_to_end(&mut bytes)
         .unwrap();
 
@@ -156,7 +158,7 @@ fn open_nonexistent_file() {
     let lib = TR_BASIC.open();
     let id = Sha1::parse("0000000000000000000000000000000000000000").unwrap();
 
-    match lib.file_reader_from_id(id) {
+    match lib.file_by_id(id) {
         Err(SeafError::IO(e)) => assert_eq!(e.kind(), io::ErrorKind::NotFound),
         _ => unreachable!(),
     };

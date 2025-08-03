@@ -83,7 +83,7 @@ fn do_extract(args: &Args, lib: &Library) {
                 let path = full_parent.join(&de.name);
                 let mut w = fs::File::create_new(&path)
                     .unwrap_or_else(|e| panic!("Failed to create new file {:?}: {:?}", &path, e));
-                let mut r = lib.file_reader_from_json(&f);
+                let mut r = lib.file_by_json(&f).to_reader();
 
                 io::copy(&mut r, &mut w).expect("Failed to copy data to new file");
 
@@ -93,7 +93,10 @@ fn do_extract(args: &Args, lib: &Library) {
     }
 
     if args.verbose {
-        println!("Extracted {dir_counter} directories, {file_counter} files");
+        println!(
+            "Extracted {} directories, {} files",
+            dir_counter, file_counter
+        );
     }
 }
 

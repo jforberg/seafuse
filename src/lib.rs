@@ -74,13 +74,19 @@ impl Library {
         full_obj_path(&self.location, ty, id)
     }
 
-    pub fn file_reader_from_json(&self, file: &FileJson) -> FileReader {
-        FileReader::new(self.location.clone(), &file.block_ids)
+    pub fn file_by_json(&self, file: &FileJson) -> File {
+        File {
+            location: self.location.clone(),
+            block_ids: file.block_ids.clone(),
+        }
     }
 
-    pub fn file_reader_from_id(&self, id: Sha1) -> Result<FileReader, SeafError> {
+    pub fn file_by_id(&self, id: Sha1) -> Result<File, SeafError> {
         let file = self.load_fs(id)?.try_file()?;
-        Ok(self.file_reader_from_json(&file))
+        Ok(File {
+            location: self.location.clone(),
+            block_ids: file.block_ids,
+        })
     }
 }
 
@@ -91,6 +97,17 @@ fn full_obj_path(ll: &LibraryLocation, ty: &str, id: Sha1) -> PathBuf {
 
 fn obj_type_path(ll: &LibraryLocation, ty: &str) -> PathBuf {
     ll.repo_path.join(ty).join(&ll.uuid)
+}
+
+pub struct File {
+    location: Rc<LibraryLocation>,
+    block_ids: Vec<Sha1>,
+}
+
+impl File {
+    pub fn to_reader(self) -> FileReader {
+        FileReader::new(self.location, &self.block_ids)
+    }
 }
 
 #[derive(Debug)]
