@@ -28,6 +28,11 @@ const TR_BASIC: TestRepo = TestRepo {
     uuid: "868be3a7-b357-4189-af52-304b402d9904",
 };
 
+const TR_MULTIBLOCK: TestRepo = TestRepo {
+    path: "tests/testrepos/multiblock",
+    uuid: "868be3a7-b357-4189-af52-304b402d9904",
+};
+
 #[test]
 fn parse_example_commit() {
     let c = parse_commit(&TR_BASIC.path_to(
@@ -133,6 +138,20 @@ fn read_file_having_single_block() {
         .unwrap();
 
     assert_eq!(&bytes, b"# test\n\ntest\n");
+}
+
+#[test]
+fn read_file_having_multiple_blocks() {
+    let lib = TR_MULTIBLOCK.open();
+    let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
+    let mut bytes = vec![];
+
+    lib.open_file_by_id(id)
+        .unwrap()
+        .read_to_end(&mut bytes)
+        .unwrap();
+
+    assert_eq!(&bytes, b"gronkadonkachonka");
 }
 
 #[test]
