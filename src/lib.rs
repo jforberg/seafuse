@@ -18,7 +18,11 @@ pub struct Library {
 }
 
 impl Library {
-    pub fn new(repo_path: &Path, uuid: &str) -> Library {
+    pub fn open(repo_path: &Path, uuid: &str) -> Result<Library, SeafError> {
+        Library::new(repo_path, uuid).populate()
+    }
+
+    fn new(repo_path: &Path, uuid: &str) -> Library {
         Library {
             repo_path: repo_path.to_owned(),
             uuid: uuid.to_owned(),
@@ -26,7 +30,7 @@ impl Library {
         }
     }
 
-    pub fn populate(mut self) -> Result<Library, SeafError> {
+    fn populate(mut self) -> Result<Library, SeafError> {
         let mut head_commit: Option<Commit> = None;
 
         // The head commit is assumed to be the most recent commit

@@ -16,9 +16,7 @@ fn path_to(ty: &str, uuid: &str) -> PathBuf {
 }
 
 fn open_test_lib() -> Library {
-    Library::new(Path::new(TEST_REPO_PATH), TEST_REPO_UUID)
-        .populate()
-        .unwrap()
+    Library::open(Path::new(TEST_REPO_PATH), TEST_REPO_UUID).unwrap()
 }
 
 #[test]
@@ -73,9 +71,7 @@ fn parse_example_fs_dir() {
 
 #[test]
 fn lookup_head_commit() {
-    let lib = Library::new(Path::new(TEST_REPO_PATH), TEST_REPO_UUID)
-        .populate()
-        .unwrap();
+    let lib = Library::open(Path::new(TEST_REPO_PATH), TEST_REPO_UUID).unwrap();
     assert_eq!(
         lib.head_commit.unwrap().commit_id.to_string(),
         "a47ac095b65fdfb64dd751570219036202577f0c"
@@ -98,10 +94,7 @@ fn sha1_malformed() {
 
 #[test]
 fn walk_lib_fs() {
-    let lib = Library::new(Path::new(TEST_REPO_PATH), TEST_REPO_UUID)
-        .populate()
-        .unwrap();
-
+    let lib = Library::open(Path::new(TEST_REPO_PATH), TEST_REPO_UUID).unwrap();
     let mut file_names = HashSet::new();
 
     for r in lib.walk_fs() {

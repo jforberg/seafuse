@@ -35,13 +35,7 @@ enum Op {
 fn main() {
     let args = Args::parse();
 
-    let mut lib = Library::new(&args.source, &args.uuid);
-
-    if args.verbose {
-        println!("Looking for head commit...");
-    }
-
-    lib = lib.populate().expect("find head commit");
+    let lib = Library::open(&args.source, &args.uuid).unwrap();
     let head = lib.head_commit.as_ref().unwrap();
 
     if args.verbose {
