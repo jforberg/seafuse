@@ -4,24 +4,33 @@ use std::io;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-const TEST_REPO_PATH: &str = "tests/data/testrepo/";
-const TEST_REPO_UUID: &str = "868be3a7-b357-4189-af52-304b402d9904";
-
-fn path_to(ty: &str, uuid: &str) -> PathBuf {
-    Path::new(TEST_REPO_PATH)
-        .join(ty)
-        .join(TEST_REPO_UUID)
-        .join(&uuid[..2])
-        .join(&uuid[2..])
+struct TestRepo {
+    pub path: &'static str,
+    pub uuid: &'static str,
 }
 
-fn open_test_lib() -> Library {
-    Library::open(Path::new(TEST_REPO_PATH), TEST_REPO_UUID).unwrap()
+impl TestRepo {
+    fn path_to(&self, ty: &str, uuid: &str) -> PathBuf {
+        Path::new(&self.path)
+            .join(ty)
+            .join(&self.uuid)
+            .join(&uuid[..2])
+            .join(&uuid[2..])
+    }
+
+    fn open(&self) -> Library {
+        Library::open(Path::new(self.path), self.uuid).unwrap()
+    }
 }
+
+const TR_BASIC: TestRepo = TestRepo {
+    path: "tests/testrepos/basic",
+    uuid: "868be3a7-b357-4189-af52-304b402d9904",
+};
 
 #[test]
 fn parse_example_commit() {
-    let c = parse_commit(&path_to(
+    let c = parse_commit(&TR_BASIC.path_to(
         "commits",
         "038cac5ffc20b13a4fac8d21e60bf01d03f8a179",
     ))
@@ -34,7 +43,7 @@ fn parse_example_commit() {
 
 #[test]
 fn find_and_parse_commits() {
-    let p = Path::new(TEST_REPO_PATH).join("commits");
+    let p = Path::new(&TR_BASIC.path).join("commits");
     let ids: Vec<String> = CommitIterator::new(&p)
         .map(|c| c.unwrap().commit_id.to_string())
         .collect();
@@ -50,7 +59,7 @@ fn find_and_parse_commits() {
 
 #[test]
 fn parse_example_fs_file() {
-    let f = parse_fs(&path_to("fs", "e40b894880747010bf6ec384b83e578f352beed7"))
+    let f = parse_fs(&TR_BASIC.path_to("fs", "e40b894880747010bf6ec384b83e578f352beed7"))
         .unwrap()
         .unwrap_file();
 
@@ -60,7 +69,7 @@ fn parse_example_fs_file() {
 
 #[test]
 fn parse_example_fs_dir() {
-    let d = parse_fs(&path_to("fs", "ebd03d7c735be353d1c6d302e1092e69b5c5d041"))
+    let d = parse_fs(&TR_BASIC.path_to("fs", "ebd03d7c735be353d1c6d302e1092e69b5c5d041"))
         .unwrap()
         .unwrap_dir();
     assert_eq!(
@@ -71,7 +80,7 @@ fn parse_example_fs_dir() {
 
 #[test]
 fn lookup_head_commit() {
-    let lib = Library::open(Path::new(TEST_REPO_PATH), TEST_REPO_UUID).unwrap();
+    let lib = TR_BASIC.open();
     assert_eq!(
         lib.head_commit.unwrap().commit_id.to_string(),
         "a47ac095b65fdfb64dd751570219036202577f0c"
@@ -94,7 +103,7 @@ fn sha1_malformed() {
 
 #[test]
 fn walk_lib_fs() {
-    let lib = Library::open(Path::new(TEST_REPO_PATH), TEST_REPO_UUID).unwrap();
+    let lib = TR_BASIC.open();
     let mut file_names = HashSet::new();
 
     for r in lib.walk_fs() {
@@ -114,7 +123,7 @@ fn walk_lib_fs() {
 
 #[test]
 fn read_file_having_single_block() {
-    let lib = open_test_lib();
+    let lib = TR_BASIC.open();
     let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
     let mut bytes = vec![];
 
@@ -128,7 +137,7 @@ fn read_file_having_single_block() {
 
 #[test]
 fn open_nonexistent_file() {
-    let lib = open_test_lib();
+    let lib = TR_BASIC.open();
     let id = Sha1::parse("0000000000000000000000000000000000000000").unwrap();
 
     match lib.open_file_by_id(id) {
