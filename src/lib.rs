@@ -7,13 +7,19 @@ use std::{
     fs,
     io::Read,
     path::{Path, PathBuf},
+    rc::Rc,
 };
 use walkdir::WalkDir;
 
 #[derive(Debug, Clone)]
-pub struct Library {
+pub struct LibraryLocation {
     pub repo_path: PathBuf,
     pub uuid: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct Library {
+    pub location: Rc<LibraryLocation>,
     pub head_commit: Option<CommitJson>,
 }
 
@@ -24,8 +30,10 @@ impl Library {
 
     fn new(repo_path: &Path, uuid: &str) -> Library {
         Library {
-            repo_path: repo_path.to_owned(),
-            uuid: uuid.to_owned(),
+            location: Rc::new(LibraryLocation {
+                repo_path: repo_path.to_owned(),
+                uuid: uuid.to_owned(),
+            }),
             head_commit: None,
         }
     }
@@ -34,7 +42,7 @@ impl Library {
         let mut head_commit: Option<CommitJson> = None;
 
         // The head commit is assumed to be the most recent commit
-        for c in CommitIterator::new(&self.obj_type_path("commits")) {
+        for c in CommitIterator::new(&obj_type_path(&self.location, "commits")) {
             let c = c?;
 
             if let Some(ref hc) = head_commit {
@@ -63,30 +71,26 @@ impl Library {
     }
 
     fn obj_path(&self, ty: &str, id: Sha1) -> PathBuf {
-        full_obj_path(&self.obj_type_path(ty), id)
+        full_obj_path(&self.location, ty, id)
     }
 
-    fn obj_type_path(&self, ty: &str) -> PathBuf {
-        self.repo_path.join(ty).join(&self.uuid)
+    pub fn file_reader_from_json(&self, file: &FileJson) -> FileReader {
+        FileReader::new(self.location.clone(), &file.block_ids)
     }
 
-    pub fn open_file(&self, file: &FileJson) -> FileReader {
-        self.open_file_from_blocks(&file.block_ids)
-    }
-
-    pub fn open_file_by_id(&self, id: Sha1) -> Result<FileReader, SeafError> {
+    pub fn file_reader_from_id(&self, id: Sha1) -> Result<FileReader, SeafError> {
         let file = self.load_fs(id)?.try_file()?;
-        Ok(self.open_file_from_blocks(&file.block_ids))
-    }
-
-    pub fn open_file_from_blocks(&self, block_ids: &[Sha1]) -> FileReader {
-        FileReader::new(self.obj_type_path("blocks"), block_ids)
+        Ok(self.file_reader_from_json(&file))
     }
 }
 
-fn full_obj_path(obj_type_path: &Path, id: Sha1) -> PathBuf {
+fn full_obj_path(ll: &LibraryLocation, ty: &str, id: Sha1) -> PathBuf {
     let id_str = id.to_string();
-    obj_type_path.join(&id_str[0..2]).join(&id_str[2..])
+    obj_type_path(ll, ty).join(&id_str[0..2]).join(&id_str[2..])
+}
+
+fn obj_type_path(ll: &LibraryLocation, ty: &str) -> PathBuf {
+    ll.repo_path.join(ty).join(&ll.uuid)
 }
 
 #[derive(Debug)]
@@ -207,15 +211,15 @@ impl Iterator for CommitIterator {
 
 #[derive(Debug)]
 pub struct FileReader {
-    block_path: PathBuf,
+    location: Rc<LibraryLocation>,
     block_ids: Vec<Sha1>,
     cur_file: Option<fs::File>,
 }
 
 impl FileReader {
-    pub fn new(block_path: PathBuf, block_ids: &[Sha1]) -> FileReader {
+    pub fn new(location: Rc<LibraryLocation>, block_ids: &[Sha1]) -> FileReader {
         let mut fr = FileReader {
-            block_path,
+            location,
             block_ids: vec![],
             cur_file: None,
         };
@@ -237,7 +241,7 @@ impl Read for FileReader {
             None => match self.block_ids.pop() {
                 None => return Ok(0),
                 Some(bid) => {
-                    let path = full_obj_path(&self.block_path, bid);
+                    let path = full_obj_path(&self.location, "blocks", bid);
                     let file = fs::File::open(path)?;
                     self.cur_file.insert(file)
                 }
