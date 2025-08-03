@@ -154,6 +154,58 @@ fn read_file_having_multiple_blocks() {
 }
 
 #[test]
+fn read_file_range() {
+    let lib = TR_MULTIBLOCK.open();
+    let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
+    let mut bytes = [0; 7];
+
+    let c = lib
+        .file_by_id(id)
+        .unwrap()
+        .to_block_reader()
+        .unwrap()
+        .read_at_offset(5, &mut bytes)
+        .unwrap();
+
+    assert_eq!(c, 7);
+    assert_eq!(&bytes, b"adonkac");
+}
+
+#[test]
+fn read_empty_range() {
+    let lib = TR_MULTIBLOCK.open();
+    let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
+    let mut bytes = [];
+
+    let c = lib
+        .file_by_id(id)
+        .unwrap()
+        .to_block_reader()
+        .unwrap()
+        .read_at_offset(5, &mut bytes)
+        .unwrap();
+
+    assert_eq!(c, 0);
+}
+
+#[test]
+fn read_range_outside() {
+    let lib = TR_MULTIBLOCK.open();
+    let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
+    let mut bytes = [0; 10];
+
+    let c = lib
+        .file_by_id(id)
+        .unwrap()
+        .to_block_reader()
+        .unwrap()
+        .read_at_offset(20, &mut bytes)
+        .unwrap();
+
+    assert_eq!(c, 0);
+}
+
+#[test]
 fn open_nonexistent_file() {
     let lib = TR_BASIC.open();
     let id = Sha1::parse("0000000000000000000000000000000000000000").unwrap();

@@ -1,11 +1,12 @@
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Deserializer};
 use std::{
+    cmp::min,
     fmt,
     fmt::Debug,
     fmt::Display,
     fs,
-    io::Read,
+    io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
     rc::Rc,
 };
@@ -107,6 +108,10 @@ pub struct File {
 impl File {
     pub fn to_reader(self) -> FileReader {
         FileReader::new(self.location, &self.block_ids)
+    }
+
+    pub fn to_block_reader(self) -> Result<FileBlockReader, SeafError> {
+        FileBlockReader::from_file(self)
     }
 }
 
@@ -272,6 +277,78 @@ impl Read for FileReader {
 
         self.cur_file = None;
         self.read(buf)
+    }
+}
+
+pub struct FileBlockReader {
+    location: Rc<LibraryLocation>,
+    block_ids: Vec<Sha1>,
+    block_sizes: Vec<usize>,
+    size: usize,
+}
+
+impl FileBlockReader {
+    pub fn from_file(file: File) -> Result<FileBlockReader, SeafError> {
+        let mut block_sizes = vec![];
+        let mut size = 0;
+
+        for id in &file.block_ids {
+            let path = full_obj_path(&file.location, "blocks", *id);
+            let md = fs::metadata(&path)?;
+            block_sizes.push(md.len() as usize);
+            size += md.len() as usize;
+        }
+
+        Ok(FileBlockReader {
+            location: file.location,
+            block_ids: file.block_ids,
+            block_sizes,
+            size,
+        })
+    }
+
+    pub fn read_at_offset(&self, offset: u64, buf: &mut [u8]) -> Result<usize, SeafError> {
+        let to_read = buf.len();
+        let mut have_read = 0;
+
+        match self.find_start_block(offset) {
+            None => Ok(0),
+            Some((mut block_idx, mut block_offset)) => {
+                while have_read < to_read && block_idx < self.block_ids.len() {
+                    let this_block_size = self.block_sizes[block_idx];
+                    let to_read_this_block =
+                        min(to_read - have_read, this_block_size - block_offset);
+                    let file_path =
+                        full_obj_path(&self.location, "blocks", self.block_ids[block_idx]);
+                    let mut file = fs::File::open(file_path)?;
+
+                    file.seek(SeekFrom::Start(block_offset as u64))?;
+                    file.read_exact(&mut buf[have_read..have_read + to_read_this_block])?;
+
+                    have_read += to_read_this_block;
+                    block_idx += 1;
+                    block_offset = 0;
+                }
+
+                Ok(have_read)
+            }
+        }
+    }
+
+    fn find_start_block(&self, offset: u64) -> Option<(usize, usize)> {
+        let mut byte_idx = 0;
+
+        for block_idx in 0..self.block_ids.len() {
+            let this_size = self.block_sizes[block_idx];
+
+            if byte_idx + this_size > offset as usize {
+                return Some((block_idx, offset as usize - byte_idx));
+            }
+
+            byte_idx += this_size;
+        }
+
+        None
     }
 }
 
