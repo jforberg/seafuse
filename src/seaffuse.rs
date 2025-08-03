@@ -64,7 +64,7 @@ impl SeafFuse {
         let fs = self.lib.load_fs(id).map_err(|_e| EIO)?;
 
         match fs {
-            Fs::Dir(_) => Ok(FileAttr {
+            FsJson::Dir(_) => Ok(FileAttr {
                 ino,
                 size: 0,
                 blocks: 0,
@@ -81,7 +81,7 @@ impl SeafFuse {
                 blksize: 0,
                 flags: 0,
             }),
-            Fs::File(f) => Ok(FileAttr {
+            FsJson::File(f) => Ok(FileAttr {
                 ino,
                 size: f.size,
                 blocks: 0,
@@ -114,8 +114,8 @@ impl SeafFuse {
             results.push(Dentry {
                 ino: de_ino,
                 kind: match de_fs {
-                    Fs::Dir(_) => FileType::Directory,
-                    Fs::File(_) => FileType::RegularFile,
+                    FsJson::Dir(_) => FileType::Directory,
+                    FsJson::File(_) => FileType::RegularFile,
                 },
                 name: OsString::from(de.name),
             });

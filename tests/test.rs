@@ -35,11 +35,8 @@ const TR_MULTIBLOCK: TestRepo = TestRepo {
 
 #[test]
 fn parse_example_commit() {
-    let c = parse_commit(&TR_BASIC.path_to(
-        "commits",
-        "038cac5ffc20b13a4fac8d21e60bf01d03f8a179",
-    ))
-    .unwrap();
+    let c = parse_commit(&TR_BASIC.path_to("commits", "038cac5ffc20b13a4fac8d21e60bf01d03f8a179"))
+        .unwrap();
     assert_eq!(
         c.commit_id.to_string(),
         "038cac5ffc20b13a4fac8d21e60bf01d03f8a179"
@@ -64,7 +61,7 @@ fn find_and_parse_commits() {
 
 #[test]
 fn parse_example_fs_file() {
-    let f = parse_fs(&TR_BASIC.path_to("fs", "e40b894880747010bf6ec384b83e578f352beed7"))
+    let f = parse_fs_json(&TR_BASIC.path_to("fs", "e40b894880747010bf6ec384b83e578f352beed7"))
         .unwrap()
         .unwrap_file();
 
@@ -74,7 +71,7 @@ fn parse_example_fs_file() {
 
 #[test]
 fn parse_example_fs_dir() {
-    let d = parse_fs(&TR_BASIC.path_to("fs", "ebd03d7c735be353d1c6d302e1092e69b5c5d041"))
+    let d = parse_fs_json(&TR_BASIC.path_to("fs", "ebd03d7c735be353d1c6d302e1092e69b5c5d041"))
         .unwrap()
         .unwrap_dir();
     assert_eq!(

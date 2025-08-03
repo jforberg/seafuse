@@ -14,7 +14,7 @@ use walkdir::WalkDir;
 pub struct Library {
     pub repo_path: PathBuf,
     pub uuid: String,
-    pub head_commit: Option<Commit>,
+    pub head_commit: Option<CommitJson>,
 }
 
 impl Library {
@@ -31,7 +31,7 @@ impl Library {
     }
 
     fn populate(mut self) -> Result<Library, SeafError> {
-        let mut head_commit: Option<Commit> = None;
+        let mut head_commit: Option<CommitJson> = None;
 
         // The head commit is assumed to be the most recent commit
         for c in CommitIterator::new(&self.obj_type_path("commits")) {
@@ -54,8 +54,8 @@ impl Library {
         Ok(self)
     }
 
-    pub fn load_fs(&self, id: Sha1) -> Result<Fs, SeafError> {
-        parse_fs(&self.obj_path("fs", id))
+    pub fn load_fs(&self, id: Sha1) -> Result<FsJson, SeafError> {
+        parse_fs_json(&self.obj_path("fs", id))
     }
 
     pub fn walk_fs(&self) -> FsIterator {
@@ -70,7 +70,7 @@ impl Library {
         self.repo_path.join(ty).join(&self.uuid)
     }
 
-    pub fn open_file(&self, file: &File) -> FileReader {
+    pub fn open_file(&self, file: &FileJson) -> FileReader {
         self.open_file_from_blocks(&file.block_ids)
     }
 
@@ -103,7 +103,7 @@ enum FsItState {
 
 #[derive(Debug)]
 struct FsItNrState {
-    stack: Vec<Dir>,
+    stack: Vec<DirJson>,
     path: PathBuf,
 }
 
@@ -117,7 +117,7 @@ impl FsIterator<'_> {
         }
     }
 
-    fn next_result(&mut self) -> Result<Option<(PathBuf, Dirent, Fs)>, SeafError> {
+    fn next_result(&mut self) -> Result<Option<(PathBuf, DirentJson, FsJson)>, SeafError> {
         // TODO Too much copying is going on here, optimise
         let nr_state = match &mut self.state {
             FsItState::Root(root_id) => {
@@ -141,7 +141,7 @@ impl FsIterator<'_> {
                 let fs = self.lib.load_fs(de.id)?;
                 let path_before = nr_state.path.clone();
 
-                if let Fs::Dir(ref d) = fs {
+                if let FsJson::Dir(ref d) = fs {
                     nr_state.stack.push(d.clone());
                     nr_state.path.push(&de.name);
                 }
@@ -158,34 +158,16 @@ impl FsIterator<'_> {
 }
 
 impl Iterator for FsIterator<'_> {
-    type Item = Result<(PathBuf, Dirent, Fs), SeafError>;
+    type Item = Result<(PathBuf, DirentJson, FsJson), SeafError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.next_result().transpose()
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct Commit {
-    pub commit_id: Sha1,
-    pub root_id: Sha1,
-    pub repo_id: String,
-    pub creator_name: String,
-    pub creator: String,
-    pub description: String,
-    pub ctime: u64,
-    pub parent_id: Option<Sha1>,
-    pub second_parent_id: Option<Sha1>,
-    pub repo_name: String,
-    pub repo_desc: String,
-    pub repo_category: Option<String>,
-    pub no_local_history: u32,
-    pub version: u32,
-}
-
-pub fn parse_commit(filename: &Path) -> Result<Commit, SeafError> {
+pub fn parse_commit(filename: &Path) -> Result<CommitJson, SeafError> {
     let f = fs::File::open(filename)?;
-    let c: Commit =
+    let c: CommitJson =
         serde_json::from_reader(f).map_err(|e| SeafError::ParseJson(filename.to_owned(), e))?;
     Ok(c)
 }
@@ -204,7 +186,7 @@ impl CommitIterator {
 }
 
 impl Iterator for CommitIterator {
-    type Item = Result<Commit, SeafError>;
+    type Item = Result<CommitJson, SeafError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         for x in &mut self.it {
@@ -221,77 +203,6 @@ impl Iterator for CommitIterator {
         }
         None
     }
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct File {
-    pub block_ids: Vec<Sha1>,
-    pub size: u64,
-    #[serde(rename(deserialize = "type"))]
-    pub ty: u32,
-    pub version: u32,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct Dir {
-    pub dirents: Vec<Dirent>,
-    #[serde(rename(deserialize = "type"))]
-    pub ty: u32,
-    pub version: u32,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct Dirent {
-    pub id: Sha1,
-    pub mode: u32,
-    pub mtime: u64,
-    pub name: String,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-#[serde(untagged)]
-pub enum Fs {
-    File(File),
-    Dir(Dir),
-}
-
-impl Fs {
-    pub fn unwrap_file(self) -> File {
-        self.try_file().unwrap()
-    }
-
-    pub fn unwrap_dir(self) -> Dir {
-        self.try_dir().unwrap()
-    }
-
-    pub fn try_file(self) -> Result<File, SeafError> {
-        match self {
-            Fs::File(f) => Ok(f),
-            _ => Err(SeafError::WrongFsType),
-        }
-    }
-
-    pub fn try_dir(self) -> Result<Dir, SeafError> {
-        match self {
-            Fs::Dir(d) => Ok(d),
-            _ => Err(SeafError::WrongFsType),
-        }
-    }
-
-    pub fn type_name(&self) -> &'static str {
-        match self {
-            Fs::Dir(_) => "Dir",
-            Fs::File(_) => "File",
-        }
-    }
-}
-
-pub fn parse_fs(filename: &Path) -> Result<Fs, SeafError> {
-    let f = fs::File::open(filename)?;
-    let dec = ZlibDecoder::new(f);
-    let fs: Fs =
-        serde_json::from_reader(dec).map_err(|e| SeafError::ParseJson(filename.to_owned(), e))?;
-    Ok(fs)
 }
 
 #[derive(Debug)]
@@ -341,6 +252,95 @@ impl Read for FileReader {
         self.cur_file = None;
         self.read(buf)
     }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct CommitJson {
+    pub commit_id: Sha1,
+    pub root_id: Sha1,
+    pub repo_id: String,
+    pub creator_name: String,
+    pub creator: String,
+    pub description: String,
+    pub ctime: u64,
+    pub parent_id: Option<Sha1>,
+    pub second_parent_id: Option<Sha1>,
+    pub repo_name: String,
+    pub repo_desc: String,
+    pub repo_category: Option<String>,
+    pub no_local_history: u32,
+    pub version: u32,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct FileJson {
+    pub block_ids: Vec<Sha1>,
+    pub size: u64,
+    #[serde(rename(deserialize = "type"))]
+    pub ty: u32,
+    pub version: u32,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct DirJson {
+    pub dirents: Vec<DirentJson>,
+    #[serde(rename(deserialize = "type"))]
+    pub ty: u32,
+    pub version: u32,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct DirentJson {
+    pub id: Sha1,
+    pub mode: u32,
+    pub mtime: u64,
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[serde(untagged)]
+pub enum FsJson {
+    File(FileJson),
+    Dir(DirJson),
+}
+
+impl FsJson {
+    pub fn unwrap_file(self) -> FileJson {
+        self.try_file().unwrap()
+    }
+
+    pub fn unwrap_dir(self) -> DirJson {
+        self.try_dir().unwrap()
+    }
+
+    pub fn try_file(self) -> Result<FileJson, SeafError> {
+        match self {
+            FsJson::File(f) => Ok(f),
+            _ => Err(SeafError::WrongFsType),
+        }
+    }
+
+    pub fn try_dir(self) -> Result<DirJson, SeafError> {
+        match self {
+            FsJson::Dir(d) => Ok(d),
+            _ => Err(SeafError::WrongFsType),
+        }
+    }
+
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            FsJson::Dir(_) => "Dir",
+            FsJson::File(_) => "File",
+        }
+    }
+}
+
+pub fn parse_fs_json(filename: &Path) -> Result<FsJson, SeafError> {
+    let f = fs::File::open(filename)?;
+    let dec = ZlibDecoder::new(f);
+    let fs: FsJson =
+        serde_json::from_reader(dec).map_err(|e| SeafError::ParseJson(filename.to_owned(), e))?;
+    Ok(fs)
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]

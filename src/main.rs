@@ -72,14 +72,14 @@ fn do_extract(args: &Args, lib: &Library) {
         }
 
         match fs {
-            Fs::Dir(_) => {
+            FsJson::Dir(_) => {
                 fs::create_dir(&full_path).unwrap_or_else(|e| {
                     panic!("Failed to create new directory {:?}: {:?}", &full_path, e)
                 });
 
                 dir_counter += 1;
             }
-            Fs::File(f) => {
+            FsJson::File(f) => {
                 let path = full_parent.join(&de.name);
                 let mut w = fs::File::create_new(&path)
                     .unwrap_or_else(|e| panic!("Failed to create new file {:?}: {:?}", &path, e));
