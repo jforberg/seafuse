@@ -2,4 +2,4 @@
 
 import zlib, sys
 
-sys.stdout.buffer.write(zlib.decompress(sys.stdin.buffer.read()))
+sys.stdout.buffer.write(zlib.compress(sys.stdin.buffer.read()))
