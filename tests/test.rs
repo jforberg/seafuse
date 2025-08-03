@@ -13,7 +13,7 @@ impl TestRepo {
     fn path_to(&self, ty: &str, uuid: &str) -> PathBuf {
         Path::new(&self.path)
             .join(ty)
-            .join(&self.uuid)
+            .join(self.uuid)
             .join(&uuid[..2])
             .join(&uuid[2..])
     }
@@ -93,7 +93,7 @@ fn lookup_head_commit() {
 fn sha1_roundtrip() {
     let raw = "e40b894880747010bf6ec384b83e578f352beed7";
     let sha1 = Sha1::parse(raw).unwrap();
-    println!("{:?}", sha1);
+    println!("{sha1:?}");
     assert_eq!(sha1.to_string(), raw);
 }
 

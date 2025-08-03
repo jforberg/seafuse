@@ -140,7 +140,7 @@ impl SeafFuse {
 impl Filesystem for SeafFuse {
     fn access(&mut self, _req: &Request, ino: u64, _mask: i32, reply: ReplyEmpty) {
         if self.verbose {
-            println!("access({}) -> 0", ino);
+            println!("access({ino}) -> 0");
         }
 
         reply.ok();
@@ -159,7 +159,7 @@ impl Filesystem for SeafFuse {
         };
 
         if self.verbose {
-            println!("lookup({}, {:?}) -> {}", parent, name, r);
+            println!("lookup({parent}, {name:?}) -> {r}");
         }
     }
 
@@ -176,7 +176,7 @@ impl Filesystem for SeafFuse {
         };
 
         if self.verbose {
-            println!("getattr({}) -> {}", ino, r);
+            println!("getattr({ino}) -> {r}");
         }
     }
 
@@ -211,7 +211,7 @@ impl Filesystem for SeafFuse {
         };
 
         if self.verbose {
-            println!("readdir({}) -> {}", ino, r);
+            println!("readdir({ino}) -> {r}");
         }
     }
 }

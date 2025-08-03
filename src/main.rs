@@ -93,10 +93,7 @@ fn do_extract(args: &Args, lib: &Library) {
     }
 
     if args.verbose {
-        println!(
-            "Extracted {} directories, {} files",
-            dir_counter, file_counter
-        );
+        println!("Extracted {dir_counter} directories, {file_counter} files");
     }
 }
 
