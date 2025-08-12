@@ -1,7 +1,7 @@
 use seafrepo::*;
 use std::collections::HashSet;
 use std::io;
-use std::io::Read;
+use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 struct TestRepo {
@@ -161,13 +161,10 @@ fn read_file_range() {
     let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
     let mut bytes = [0; 7];
 
-    let c = lib
-        .file_by_id(id)
-        .unwrap()
-        .to_block_reader()
-        .unwrap()
-        .read_at_offset(5, &mut bytes)
-        .unwrap();
+    let mut r = lib.file_by_id(id).unwrap().to_reader().unwrap();
+
+    r.seek(SeekFrom::Start(5)).unwrap();
+    let c = r.read(&mut bytes).unwrap();
 
     assert_eq!(c, 7);
     assert_eq!(&bytes, b"adonkac");
@@ -179,13 +176,10 @@ fn read_empty_range() {
     let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
     let mut bytes = [];
 
-    let c = lib
-        .file_by_id(id)
-        .unwrap()
-        .to_block_reader()
-        .unwrap()
-        .read_at_offset(5, &mut bytes)
-        .unwrap();
+    let mut r = lib.file_by_id(id).unwrap().to_reader().unwrap();
+
+    r.seek(SeekFrom::Start(5)).unwrap();
+    let c = r.read(&mut bytes).unwrap();
 
     assert_eq!(c, 0);
 }
@@ -196,13 +190,10 @@ fn read_range_outside() {
     let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
     let mut bytes = [0; 10];
 
-    let c = lib
-        .file_by_id(id)
-        .unwrap()
-        .to_block_reader()
-        .unwrap()
-        .read_at_offset(20, &mut bytes)
-        .unwrap();
+    let mut r = lib.file_by_id(id).unwrap().to_reader().unwrap();
+
+    r.seek(SeekFrom::Start(20)).unwrap();
+    let c = r.read(&mut bytes).unwrap();
 
     assert_eq!(c, 0);
 }

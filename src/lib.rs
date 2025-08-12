@@ -110,7 +110,7 @@ impl File {
         Ok(FileReader::new(self.to_block_reader()?))
     }
 
-    pub fn to_block_reader(self) -> Result<FileBlockReader, SeafError> {
+    fn to_block_reader(self) -> Result<FileBlockReader, SeafError> {
         FileBlockReader::from_file(self)
     }
 }
@@ -238,7 +238,7 @@ pub struct FileReader {
 }
 
 impl FileReader {
-    pub fn new(block_reader: FileBlockReader) -> FileReader {
+    fn new(block_reader: FileBlockReader) -> FileReader {
         FileReader {
             block_reader,
             byte_pos: 0,
@@ -259,8 +259,38 @@ impl Read for FileReader {
     }
 }
 
+impl Seek for FileReader {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        match pos {
+            SeekFrom::Start(o) => {
+                self.byte_pos = o;
+                Ok(self.byte_pos)
+            }
+            SeekFrom::End(o) => {
+                let end_pos = self.block_reader.size as i64;
+                let new_pos = end_pos + o;
+                if new_pos < 0 {
+                    return Err(From::from(io::ErrorKind::InvalidInput));
+                }
+
+                self.byte_pos = new_pos as u64;
+                Ok(self.byte_pos)
+            }
+            SeekFrom::Current(o) => {
+                let new_pos = self.byte_pos as i64 + o;
+                if new_pos < 0 {
+                    return Err(From::from(io::ErrorKind::InvalidInput));
+                }
+
+                self.byte_pos = new_pos as u64;
+                Ok(self.byte_pos)
+            }
+        }
+    }
+}
+
 #[derive(Debug)]
-pub struct FileBlockReader {
+struct FileBlockReader {
     location: Rc<LibraryLocation>,
     block_ids: Vec<Sha1>,
     block_sizes: Vec<usize>,
@@ -268,7 +298,7 @@ pub struct FileBlockReader {
 }
 
 impl FileBlockReader {
-    pub fn from_file(file: File) -> Result<FileBlockReader, SeafError> {
+    fn from_file(file: File) -> Result<FileBlockReader, SeafError> {
         let mut block_sizes = vec![];
         let mut size = 0;
 
@@ -287,7 +317,7 @@ impl FileBlockReader {
         })
     }
 
-    pub fn read_at_offset(&self, offset: u64, buf: &mut [u8]) -> Result<usize, SeafError> {
+    fn read_at_offset(&self, offset: u64, buf: &mut [u8]) -> Result<usize, SeafError> {
         let to_read = buf.len();
         let mut have_read = 0;
 
