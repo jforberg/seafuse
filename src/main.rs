@@ -83,7 +83,9 @@ fn do_extract(args: &Args, lib: &Library) {
                 let path = full_parent.join(&de.name);
                 let mut w = fs::File::create_new(&path)
                     .unwrap_or_else(|e| panic!("Failed to create new file {:?}: {:?}", &path, e));
-                let mut r = lib.file_by_json(&f).to_reader();
+                let mut r = lib.file_by_json(&f).to_reader().unwrap_or_else(|e| {
+                    panic!("Failed to open file ({:?}) for reading: {:?}", f, e)
+                });
 
                 io::copy(&mut r, &mut w).expect("Failed to copy data to new file");
 

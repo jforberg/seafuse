@@ -5,7 +5,7 @@ use std::{
     fmt,
     fmt::Debug,
     fmt::Display,
-    fs,
+    fs, io,
     io::{Read, Seek, SeekFrom},
     path::{Path, PathBuf},
     rc::Rc,
@@ -106,8 +106,8 @@ pub struct File {
 }
 
 impl File {
-    pub fn to_reader(self) -> FileReader {
-        FileReader::new(self.location, &self.block_ids)
+    pub fn to_reader(self) -> Result<FileReader, SeafError> {
+        Ok(FileReader::new(self.to_block_reader()?))
     }
 
     pub fn to_block_reader(self) -> Result<FileBlockReader, SeafError> {
@@ -233,53 +233,33 @@ impl Iterator for CommitIterator {
 
 #[derive(Debug)]
 pub struct FileReader {
-    location: Rc<LibraryLocation>,
-    block_ids: Vec<Sha1>,
-    cur_file: Option<fs::File>,
+    block_reader: FileBlockReader,
+    byte_pos: u64,
 }
 
 impl FileReader {
-    pub fn new(location: Rc<LibraryLocation>, block_ids: &[Sha1]) -> FileReader {
-        let mut fr = FileReader {
-            location,
-            block_ids: vec![],
-            cur_file: None,
-        };
-
-        for b in block_ids.iter().rev() {
-            fr.block_ids.push(*b);
+    pub fn new(block_reader: FileBlockReader) -> FileReader {
+        FileReader {
+            block_reader,
+            byte_pos: 0,
         }
-
-        fr
     }
 }
 
 impl Read for FileReader {
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        // We need a file to read. Either we are in the middle of reading some block, or we open
-        // the next block
-        let file = match self.cur_file {
-            Some(ref mut f) => f,
-            None => match self.block_ids.pop() {
-                None => return Ok(0),
-                Some(bid) => {
-                    let path = full_obj_path(&self.location, "blocks", bid);
-                    let file = fs::File::open(path)?;
-                    self.cur_file.insert(file)
-                }
-            },
-        };
-
-        let n = file.read(buf)?;
-        if n > 0 {
-            return Ok(n);
+        match self.block_reader.read_at_offset(self.byte_pos, buf) {
+            Ok(s) => {
+                self.byte_pos += s as u64;
+                Ok(s)
+            }
+            Err(SeafError::IO(e)) => Err(e),
+            Err(e) => Err(io::Error::from(e)),
         }
-
-        self.cur_file = None;
-        self.read(buf)
     }
 }
 
+#[derive(Debug)]
 pub struct FileBlockReader {
     location: Rc<LibraryLocation>,
     block_ids: Vec<Sha1>,
@@ -503,6 +483,12 @@ pub enum SeafError {
 impl From<std::io::Error> for SeafError {
     fn from(e: std::io::Error) -> Self {
         Self::IO(e)
+    }
+}
+
+impl From<SeafError> for io::Error {
+    fn from(e: SeafError) -> Self {
+        Self::other(format!("{:?}", e))
     }
 }
 

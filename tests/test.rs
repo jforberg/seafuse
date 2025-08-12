@@ -132,6 +132,7 @@ fn read_file_having_single_block() {
     lib.file_by_id(id)
         .unwrap()
         .to_reader()
+        .unwrap()
         .read_to_end(&mut bytes)
         .unwrap();
 
@@ -147,6 +148,7 @@ fn read_file_having_multiple_blocks() {
     lib.file_by_id(id)
         .unwrap()
         .to_reader()
+        .unwrap()
         .read_to_end(&mut bytes)
         .unwrap();
 
