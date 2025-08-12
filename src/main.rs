@@ -5,11 +5,11 @@ use std::fs;
 use std::io;
 use std::path::PathBuf;
 
-use seafrepo::*;
+use seafuse::*;
 
-use crate::seaffuse::*;
+use crate::fuse::*;
 
-mod seaffuse;
+mod fuse;
 
 #[derive(clap::Parser, Debug)]
 struct Args {

@@ -11,7 +11,7 @@ use std::ffi::{OsStr, OsString};
 use std::io::{Read, Seek, SeekFrom};
 use std::time::UNIX_EPOCH;
 
-use seafrepo::*;
+use seafuse::*;
 
 const INF_TTL: Duration = Duration::new(1_000_000_000, 0);
 

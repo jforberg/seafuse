@@ -1,4 +1,4 @@
-use seafrepo::*;
+use seafuse::*;
 use std::collections::HashSet;
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
