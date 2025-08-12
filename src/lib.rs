@@ -107,10 +107,10 @@ pub struct File {
 
 impl File {
     pub fn to_reader(self) -> Result<FileReader, SeafError> {
-        Ok(FileReader::new(self.to_block_reader()?))
+        Ok(FileReader::new(self.into_block_reader()?))
     }
 
-    fn to_block_reader(self) -> Result<FileBlockReader, SeafError> {
+    fn into_block_reader(self) -> Result<FileBlockReader, SeafError> {
         FileBlockReader::from_file(self)
     }
 }
