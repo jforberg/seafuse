@@ -488,7 +488,7 @@ impl From<std::io::Error> for SeafError {
 
 impl From<SeafError> for io::Error {
     fn from(e: SeafError) -> Self {
-        Self::other(format!("{:?}", e))
+        Self::other(format!("{e:?}"))
     }
 }
 
