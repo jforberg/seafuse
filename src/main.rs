@@ -7,10 +7,6 @@ use std::path::PathBuf;
 
 use seafuse::*;
 
-use crate::fuse::*;
-
-mod fuse;
-
 #[derive(clap::Parser, Debug)]
 struct Args {
     op: Op,

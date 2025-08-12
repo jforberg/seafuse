@@ -1,5 +1,6 @@
 use seafuse::*;
 use std::path::{Path, PathBuf};
+use tempdir::TempDir;
 
 pub struct TestRepo {
     pub path: &'static str,
@@ -29,3 +30,7 @@ pub const TR_MULTIBLOCK: TestRepo = TestRepo {
     path: "tests/testrepos/multiblock",
     uuid: "868be3a7-b357-4189-af52-304b402d9904",
 };
+
+pub fn make_temp_dir() -> TempDir {
+    TempDir::new("seafuse_test").unwrap()
+}
