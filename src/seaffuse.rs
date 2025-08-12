@@ -14,7 +14,6 @@ const INF_TTL: Duration = Duration::new(1_000_000_000, 0);
 #[derive(Debug)]
 pub struct SeafFuse {
     lib: Library,
-    verbose: bool,
     ino_table: BiMap<u64, Sha1>,
     ino_counter: u64,
 }
@@ -27,12 +26,11 @@ struct Dentry {
 }
 
 impl SeafFuse {
-    pub fn new(lib: Library, verbose: bool) -> SeafFuse {
+    pub fn new(lib: Library) -> SeafFuse {
         let root_id = lib.head_commit.as_ref().unwrap().root_id;
 
         SeafFuse {
             lib,
-            verbose,
             ino_table: BiMap::from_iter([(1, root_id)]),
             ino_counter: 2,
         }
@@ -138,16 +136,12 @@ impl SeafFuse {
 }
 
 impl Filesystem for SeafFuse {
-    fn access(&mut self, _req: &Request, ino: u64, _mask: i32, reply: ReplyEmpty) {
-        if self.verbose {
-            println!("access({ino}) -> 0");
-        }
-
+    fn access(&mut self, _req: &Request, _ino: u64, _mask: i32, reply: ReplyEmpty) {
         reply.ok();
     }
 
     fn lookup(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
-        let r = match self.do_lookup(parent, name) {
+        match self.do_lookup(parent, name) {
             Ok(attr) => {
                 reply.entry(&INF_TTL, &attr, 0);
                 0
@@ -157,14 +151,10 @@ impl Filesystem for SeafFuse {
                 r
             }
         };
-
-        if self.verbose {
-            println!("lookup({parent}, {name:?}) -> {r}");
-        }
     }
 
     fn getattr(&mut self, _req: &Request, ino: u64, _fh: Option<u64>, reply: ReplyAttr) {
-        let r = match self.do_getattr_by_ino(ino) {
+        match self.do_getattr_by_ino(ino) {
             Ok(attr) => {
                 reply.attr(&INF_TTL, &attr);
                 0
@@ -174,10 +164,6 @@ impl Filesystem for SeafFuse {
                 r
             }
         };
-
-        if self.verbose {
-            println!("getattr({ino}) -> {r}");
-        }
     }
 
     fn readdir(
@@ -188,7 +174,7 @@ impl Filesystem for SeafFuse {
         offset: i64,
         mut reply: ReplyDirectory,
     ) {
-        let r = match self.do_readdir(ino) {
+        match self.do_readdir(ino) {
             Ok(dentries) => {
                 for (i, d) in dentries.into_iter().enumerate() {
                     let i = (i + 1) as i64;
@@ -209,9 +195,5 @@ impl Filesystem for SeafFuse {
                 r
             }
         };
-
-        if self.verbose {
-            println!("readdir({ino}) -> {r}");
-        }
     }
 }

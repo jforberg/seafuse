@@ -1,4 +1,5 @@
 use flate2::read::ZlibDecoder;
+use log::debug;
 use serde::{Deserialize, Deserializer};
 use std::{
     cmp::min,
@@ -58,6 +59,13 @@ impl Library {
         self.head_commit = head_commit;
         if self.head_commit.is_none() {
             return Err(SeafError::NoHeadCommit);
+        }
+
+        if let Some(ref head) = self.head_commit {
+            debug!("Repo name: {}", head.repo_name);
+            debug!("Head commit: {}", head.commit_id);
+            debug!("Root: {}", head.root_id);
+            debug!("Last modified: {}, by {}", head.ctime, head.creator_name);
         }
 
         Ok(self)

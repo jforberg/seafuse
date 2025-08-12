@@ -1,4 +1,6 @@
 use clap::Parser;
+use log::debug;
+use simple_logger::SimpleLogger;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
@@ -35,15 +37,19 @@ enum Op {
 fn main() {
     let args = Args::parse();
 
-    let lib = Library::open(&args.source, &args.uuid).unwrap();
-    let head = lib.head_commit.as_ref().unwrap();
+    let log_level = if args.verbose {
+        log::LevelFilter::Debug
+    } else {
+        log::LevelFilter::Warn
+    };
+    SimpleLogger::new()
+        .with_level(log_level)
+        .without_timestamps()
+        .env()
+        .init()
+        .unwrap();
 
-    if args.verbose {
-        println!("Repo name: {}", head.repo_name);
-        println!("Head commit: {}", head.commit_id);
-        println!("Root: {}", head.root_id);
-        println!("Last modified: {}, by {}", head.ctime, head.creator_name);
-    }
+    let lib = Library::open(&args.source, &args.uuid).unwrap();
 
     match args.op {
         Op::Extract => do_extract(&args, &lib),
@@ -63,9 +69,7 @@ fn do_extract(args: &Args, lib: &Library) {
         let full_parent = args.target.join(p);
         let full_path = full_parent.join(&de.name);
 
-        if args.verbose {
-            println!("{} - {}", full_path.display(), fs.type_name());
-        }
+        debug!("Extracted {}: {}", fs.type_name(), full_path.display());
 
         if args.dry_run {
             continue;
@@ -101,7 +105,7 @@ fn do_extract(args: &Args, lib: &Library) {
 }
 
 fn do_mount(args: &Args, lib: &Library) {
-    let fs = SeafFuse::new(lib.clone(), args.verbose);
+    let fs = SeafFuse::new(lib.clone());
 
     fuser::mount2(fs, &args.target, &[])
         .unwrap_or_else(|e| panic!("Failed to mount {:?}: {:?}", &args.target, e));
