@@ -1,0 +1,4 @@
+# Seaffuse
+
+- Log more detailed errors, before converting to errno
+- Cache FileReaders for each open file

@@ -1,10 +1,14 @@
 use bimap::BiMap;
 use core::time::Duration;
 use fuser::{
-    FileAttr, FileType, Filesystem, ReplyAttr, ReplyDirectory, ReplyEmpty, ReplyEntry, Request,
+    FileAttr, FileType, Filesystem, ReplyAttr, ReplyData, ReplyDirectory, ReplyEmpty, ReplyEntry,
+    Request,
 };
 use libc::{c_int, EINVAL, EIO, ENOENT, ENOTDIR};
+use log::debug;
+use std::cmp::min;
 use std::ffi::{OsStr, OsString};
+use std::io::{Read, Seek, SeekFrom};
 use std::time::UNIX_EPOCH;
 
 use seafrepo::*;
@@ -133,6 +137,22 @@ impl SeafFuse {
             }
         }
     }
+
+    fn do_read(&mut self, ino: u64, offset: i64, size: u32) -> Result<Vec<u8>, c_int> {
+        let id = *self.ino_table.get_by_left(&ino).ok_or(EIO)?;
+        let f = self.lib.file_by_id(id).map_err(|_e| EIO)?;
+        let mut fr = f.to_reader().map_err(|_e| EIO)?;
+        let mut buf = vec![0; size as usize];
+
+        // XXX Is it correct to cast to u64 here? Does negative offset mean something?
+        fr.seek(SeekFrom::Start(offset as u64))
+            .map_err(|_e| EINVAL)?;
+        let r = fr.read(&mut buf).map_err(|_e| EIO)?;
+
+        buf.truncate(r);
+
+        Ok(buf)
+    }
 }
 
 impl Filesystem for SeafFuse {
@@ -196,4 +216,36 @@ impl Filesystem for SeafFuse {
             }
         };
     }
+
+    fn read(
+        &mut self,
+        _req: &Request,
+        ino: u64,
+        _fh: u64,
+        offset: i64,
+        size: u32,
+        _flags: i32,
+        _lock_owner: Option<u64>,
+        reply: ReplyData,
+    ) {
+        match self.do_read(ino, offset, size) {
+            Ok(buf) => {
+                debug!(
+                    "read(): Reply with {} bytes: {}...",
+                    buf.len(),
+                    sample_bytes(&buf)
+                );
+                reply.data(&buf);
+            }
+            Err(r) => {
+                reply.error(r);
+            }
+        }
+    }
+}
+
+fn sample_bytes(buf: &[u8]) -> String {
+    let slice = &buf[0..min(buf.len(), 32)];
+    let escaped_bytes = escape_bytes::escape(slice);
+    String::from_utf8(escaped_bytes).unwrap()
 }
