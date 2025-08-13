@@ -1,42 +1,48 @@
-use std::path::Path;
-use tempdir::TempDir;
+use fuser::FUSE_ROOT_ID;
+use libc::ENOENT;
+use std::ffi::{OsStr, OsString};
 
 use seafuse::*;
 
 pub mod util;
 use util::*;
 
-struct TestFilesystem {
-    _fuse_session: fuser::BackgroundSession,
-    temp_dir: TempDir,
-}
-
-impl TestFilesystem {
-    pub fn mount(repo: &TestRepo) -> Self {
-        let fs = SeafFuse::new(repo.open());
-        let temp_dir = make_temp_dir();
-        let path = temp_dir.path();
-
-        TestFilesystem {
-            _fuse_session: fuser::spawn_mount2(fs, path, &[]).unwrap(),
-            temp_dir,
-        }
-    }
-
-    pub fn path(&self) -> &Path {
-        self.temp_dir.path()
-    }
-}
-
 #[test]
-fn readdir() {
-    let fs = TestFilesystem::mount(&TR_BASIC);
-    let mut entries: Vec<String> = std::fs::read_dir(fs.path())
+fn readdir_several_files() {
+    let mut fs = SeafFuse::new(TR_BASIC.open());
+    let mut entries: Vec<OsString> = fs
+        .do_readdir(FUSE_ROOT_ID)
         .unwrap()
-        .map(|de| de.unwrap().file_name().into_string().unwrap())
+        .into_iter()
+        .map(|e| e.name)
         .collect();
 
     entries.sort();
 
     assert_eq!(entries, ["somedir", "test.md"]);
+}
+
+#[test]
+fn lookup_file() {
+    let mut fs = SeafFuse::new(TR_BASIC.open());
+    let attr = fs.do_lookup(FUSE_ROOT_ID, OsStr::new("test.md")).unwrap();
+
+    assert_eq!(attr.size, 13);
+}
+
+#[test]
+fn lookup_vs_getattr() {
+    let mut fs = SeafFuse::new(TR_BASIC.open());
+    let attr1 = fs.do_lookup(FUSE_ROOT_ID, OsStr::new("test.md")).unwrap();
+    let attr2 = fs.do_getattr(attr1.ino).unwrap();
+
+    assert_eq!(attr1, attr2);
+}
+
+#[test]
+fn lookup_non_existent() {
+    let mut fs = SeafFuse::new(TR_BASIC.open());
+    let r = fs.do_lookup(FUSE_ROOT_ID, OsStr::new("doesnt_exist"));
+
+    assert_eq!(r.unwrap_err(), ENOENT);
 }
