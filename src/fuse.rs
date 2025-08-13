@@ -5,7 +5,7 @@ use fuser::{
     Request, FUSE_ROOT_ID,
 };
 use libc::{c_int, EINVAL, EIO, ENOENT, ENOTDIR};
-use log::debug;
+use log::{debug, error};
 use std::cmp::min;
 use std::ffi::{OsStr, OsString};
 use std::io::{Read, Seek, SeekFrom};
@@ -15,13 +15,20 @@ use crate::repo::*;
 
 const INF_TTL: Duration = Duration::new(1_000_000_000, 0);
 
+/// Instance of a mounted seafuse filesystem
 #[derive(Debug)]
 pub struct SeafFuse {
+    /// Description of the mounted library
     lib: Library,
+
+    /// Mapping between inode numbers and FS hashes used by seafile
     ino_table: BiMap<u64, Sha1>,
+
+    /// The next inode number to be allocated
     ino_counter: u64,
 }
 
+/// Directory entry
 #[derive(Debug, Clone)]
 pub struct Dentry {
     pub ino: u64,
@@ -29,6 +36,7 @@ pub struct Dentry {
     pub name: OsString,
 }
 
+/// Intermediate trait to make the fuse implementation testable
 pub trait PreFilesystem {
     fn do_lookup(&mut self, parent_ino: u64, name: &OsStr) -> Result<FileAttr, c_int>;
     fn do_getattr(&self, ino: u64) -> Result<FileAttr, c_int>;
@@ -43,17 +51,17 @@ impl SeafFuse {
         SeafFuse {
             lib,
             ino_table: BiMap::from_iter([(FUSE_ROOT_ID, root_id)]),
-            ino_counter: 2,
+            ino_counter: FUSE_ROOT_ID + 1,
         }
     }
 
-    fn do_getattr_by_id(&mut self, id: Sha1) -> Result<FileAttr, c_int> {
-        let ino = self.lookup_or_add_ino(id);
-        self.do_getattr_by_ino(ino)
+    fn lookup_attr_by_id(&mut self, id: Sha1) -> Result<FileAttr, c_int> {
+        let ino = self.add_ino(id);
+        self.lookup_attr_by_ino(ino)
     }
 
-    fn do_getattr_by_ino(&self, ino: u64) -> Result<FileAttr, c_int> {
-        let id = *self.ino_table.get_by_left(&ino).ok_or(EIO)?;
+    fn lookup_attr_by_ino(&self, ino: u64) -> Result<FileAttr, c_int> {
+        let id = self.lookup_id_by_ino(ino)?;
         let fs = self.lib.load_fs(id).map_err(|_e| EIO)?;
 
         match fs {
@@ -94,7 +102,17 @@ impl SeafFuse {
         }
     }
 
-    fn lookup_or_add_ino(&mut self, id: Sha1) -> u64 {
+    fn lookup_id_by_ino(&self, ino: u64) -> Result<Sha1, c_int> {
+        match self.ino_table.get_by_left(&ino) {
+            None => {
+                error!("Inode {ino} does not exist");
+                Err(EIO)
+            }
+            Some(id) => Ok(*id),
+        }
+    }
+
+    fn add_ino(&mut self, id: Sha1) -> u64 {
         match self.ino_table.get_by_right(&id) {
             Some(ino) => *ino,
             None => {
@@ -109,7 +127,7 @@ impl SeafFuse {
 
 impl PreFilesystem for SeafFuse {
     fn do_lookup(&mut self, parent_ino: u64, name: &OsStr) -> Result<FileAttr, c_int> {
-        let parent_id = *self.ino_table.get_by_left(&parent_ino).ok_or(EIO)?;
+        let parent_id = self.lookup_id_by_ino(parent_ino)?;
         let parent_fs = self.lib.load_fs(parent_id).map_err(|_e| EINVAL)?;
         let parent_dir = parent_fs.try_dir().map_err(|_e| ENOTDIR)?;
 
@@ -118,24 +136,24 @@ impl PreFilesystem for SeafFuse {
                 continue;
             }
 
-            return self.do_getattr_by_id(de.id);
+            return self.lookup_attr_by_id(de.id);
         }
 
         Err(ENOENT)
     }
 
     fn do_getattr(&self, ino: u64) -> Result<FileAttr, c_int> {
-        self.do_getattr_by_ino(ino)
+        self.lookup_attr_by_ino(ino)
     }
 
     fn do_readdir(&mut self, ino: u64) -> Result<Vec<Dentry>, c_int> {
-        let id = *self.ino_table.get_by_left(&ino).ok_or(EIO)?;
+        let id = self.lookup_id_by_ino(ino)?;
         let fs = self.lib.load_fs(id).map_err(|_e| EIO)?;
         let d = fs.try_dir().map_err(|_e| ENOTDIR)?;
         let mut results = vec![];
 
         for de in d.dirents {
-            let de_ino = self.lookup_or_add_ino(de.id);
+            let de_ino = self.add_ino(de.id);
             let de_fs = self.lib.load_fs(de.id).map_err(|_e| EIO)?;
 
             results.push(Dentry {
@@ -152,7 +170,7 @@ impl PreFilesystem for SeafFuse {
     }
 
     fn do_read(&mut self, ino: u64, offset: i64, size: u32) -> Result<Vec<u8>, c_int> {
-        let id = *self.ino_table.get_by_left(&ino).ok_or(EIO)?;
+        let id = self.lookup_id_by_ino(ino)?;
         let f = self.lib.file_by_id(id).map_err(|_e| EIO)?;
         let mut fr = f.to_reader().map_err(|_e| EIO)?;
         let mut buf = vec![0; size as usize];
@@ -175,27 +193,15 @@ impl Filesystem for SeafFuse {
 
     fn lookup(&mut self, _req: &Request, parent: u64, name: &OsStr, reply: ReplyEntry) {
         match self.do_lookup(parent, name) {
-            Ok(attr) => {
-                reply.entry(&INF_TTL, &attr, 0);
-                0
-            }
-            Err(r) => {
-                reply.error(r);
-                r
-            }
+            Ok(attr) => reply.entry(&INF_TTL, &attr, 0),
+            Err(r) => reply.error(r),
         };
     }
 
     fn getattr(&mut self, _req: &Request, ino: u64, _fh: Option<u64>, reply: ReplyAttr) {
         match self.do_getattr(ino) {
-            Ok(attr) => {
-                reply.attr(&INF_TTL, &attr);
-                0
-            }
-            Err(r) => {
-                reply.error(r);
-                r
-            }
+            Ok(attr) => reply.attr(&INF_TTL, &attr),
+            Err(r) => reply.error(r),
         };
     }
 
@@ -221,12 +227,8 @@ impl Filesystem for SeafFuse {
                 }
 
                 reply.ok();
-                0
             }
-            Err(r) => {
-                reply.error(r);
-                r
-            }
+            Err(r) => reply.error(r),
         };
     }
 
@@ -257,6 +259,7 @@ impl Filesystem for SeafFuse {
     }
 }
 
+/// Get the first few bytes of the array, formatted as string
 fn sample_bytes(buf: &[u8]) -> String {
     let slice = &buf[0..min(buf.len(), 32)];
     let escaped_bytes = escape_bytes::escape(slice);
