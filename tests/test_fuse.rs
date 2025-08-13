@@ -1,9 +1,9 @@
-// XXX module is declared twice, how to fix this?
-mod util;
-
-use seafuse::*;
 use std::path::Path;
 use tempdir::TempDir;
+
+use seafuse::*;
+
+pub mod util;
 use util::*;
 
 struct TestFilesystem {
@@ -31,18 +31,10 @@ impl TestFilesystem {
 #[test]
 fn readdir() {
     let fs = TestFilesystem::mount(&TR_BASIC);
-    let mut entries = std::fs::read_dir(fs.path())
+    let mut entries: Vec<String> = std::fs::read_dir(fs.path())
         .unwrap()
-        .map(|de| {
-            de.unwrap()
-                .path()
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_string()
-        })
-        .collect::<Vec<_>>();
+        .map(|de| de.unwrap().file_name().into_string().unwrap())
+        .collect();
 
     entries.sort();
 

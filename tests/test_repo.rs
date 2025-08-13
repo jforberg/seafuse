@@ -1,11 +1,11 @@
-use seafuse::*;
 use std::collections::HashSet;
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
-mod util;
+use seafuse::*;
 
+pub mod util;
 use util::*;
 
 #[test]
