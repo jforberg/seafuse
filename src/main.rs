@@ -131,6 +131,11 @@ fn do_mount(source: &Path, uuid: &str, target: &Path) {
 
 fn do_stats(source: &Path, uuid: &str) {
     let lib = Library::open(source, uuid).unwrap();
+    let head_commit = lib.head_commit.as_ref().unwrap();
+    let head_commit_id = head_commit.commit_id;
+    let repo_name = &head_commit.repo_name;
+    println!("Head commit: {head_commit_id}");
+    println!("Repo name: {repo_name}");
 
     let mut commit_count = 0;
     let mut min_ctime = u64::MAX;
@@ -141,6 +146,13 @@ fn do_stats(source: &Path, uuid: &str) {
         min_ctime = min(min_ctime, c.ctime);
         max_ctime = max(max_ctime, c.ctime);
     }
+
+    println!("Commit count: {commit_count}");
+
+    let oldest_timestamp = format_unix_time(min_ctime);
+    let newest_timestamp = format_unix_time(max_ctime);
+    println!("Oldest timestamp: {oldest_timestamp}");
+    println!("Newest timestamp: {newest_timestamp}");
 
     let mut file_count = 0;
     let mut dir_count = 0;
@@ -159,16 +171,6 @@ fn do_stats(source: &Path, uuid: &str) {
             }
         }
     }
-
-    let head_commit_id = lib.head_commit.unwrap().commit_id;
-    println!("Head commit: {head_commit_id}");
-
-    println!("Commit count: {commit_count}");
-
-    let oldest_timestamp = format_unix_time(min_ctime);
-    let newest_timestamp = format_unix_time(max_ctime);
-    println!("Oldest timestamp: {oldest_timestamp}");
-    println!("Newest timestamp: {newest_timestamp}");
 
     println!("File count: {file_count}");
     println!("Directory count: {dir_count}");
