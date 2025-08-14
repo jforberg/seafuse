@@ -83,7 +83,7 @@ fn walk_lib_fs() {
     let lib = TR_BASIC.open();
     let mut file_names = HashSet::new();
 
-    for r in lib.walk_fs() {
+    for r in lib.fs_iterator() {
         let (p, de, _fs) = r.unwrap();
         file_names.insert(p.join(de.name));
     }

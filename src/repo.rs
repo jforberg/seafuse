@@ -44,7 +44,7 @@ impl Library {
         let mut head_commit: Option<CommitJson> = None;
 
         // The head commit is assumed to be the most recent commit
-        for c in CommitIterator::new(&obj_type_path(&self.location, "commits")) {
+        for c in self.commit_iterator() {
             let c = c?;
 
             if let Some(ref hc) = head_commit {
@@ -71,11 +71,15 @@ impl Library {
         Ok(self)
     }
 
+    pub fn commit_iterator(&self) -> CommitIterator {
+        CommitIterator::new(&obj_type_path(&self.location, "commits"))
+    }
+
     pub fn load_fs(&self, id: Sha1) -> Result<FsJson, SeafError> {
         parse_fs_json(&self.obj_path("fs", id))
     }
 
-    pub fn walk_fs(&self) -> FsIterator {
+    pub fn fs_iterator(&self) -> FsIterator {
         FsIterator::new(self)
     }
 

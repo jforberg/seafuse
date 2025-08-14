@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 bimap = "0.6.3"
+chrono = "0.4.41"
 clap = { version = "4.5.28", features = ["derive"] }
 escape-bytes = "0.1.1"
 flate2 = { version = "1.0.35", features = ["zlib"] }
