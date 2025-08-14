@@ -1,5 +1,5 @@
 use fuser::FUSE_ROOT_ID;
-use libc::ENOENT;
+use libc::{EBADF, ENOENT};
 use std::ffi::{OsStr, OsString};
 
 use seafuse::*;
@@ -57,4 +57,12 @@ fn read_file() {
     fs.do_release(fh).unwrap();
 
     assert_eq!(data, "test".as_bytes());
+}
+
+#[test]
+fn bad_file_handle() {
+    let mut fs = SeafFuse::new(TR_BASIC.open());
+    let r = fs.do_read(123, 0, 1024);
+
+    assert_eq!(r.unwrap_err(), EBADF);
 }
