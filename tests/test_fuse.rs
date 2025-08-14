@@ -51,7 +51,10 @@ fn lookup_non_existent() {
 fn read_file() {
     let mut fs = SeafFuse::new(TR_BASIC.open());
     let attr = fs.do_lookup(FUSE_ROOT_ID, OsStr::new("test.md")).unwrap();
-    let data = fs.do_read(attr.ino, 8, 4).unwrap();
+    let fh = fs.do_open(attr.ino).unwrap();
+    let data = fs.do_read(fh, 8, 4).unwrap();
+
+    fs.do_release(fh).unwrap();
 
     assert_eq!(data, "test".as_bytes());
 }
