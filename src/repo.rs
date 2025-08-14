@@ -285,26 +285,32 @@ struct FileBlockReader {
     location: Arc<LibraryLocation>,
     block_ids: Vec<Sha1>,
     block_sizes: Vec<usize>,
+    block_starts: Vec<usize>,
     size: usize,
 }
 
 impl FileBlockReader {
     fn new(file: &FileJson, location: Arc<LibraryLocation>) -> Result<FileBlockReader, SeafError> {
         let mut block_sizes = vec![];
-        let mut size = 0;
+        let mut block_starts = vec![];
+        let mut pos = 0;
 
         for id in &file.block_ids {
             let path = full_obj_path(&location, "blocks", *id);
             let md = fs::metadata(&path)?;
-            block_sizes.push(md.len() as usize);
-            size += md.len() as usize;
+            let l = md.len() as usize;
+
+            block_sizes.push(l);
+            block_starts.push(pos);
+            pos += l as usize;
         }
 
         Ok(FileBlockReader {
             location,
             block_ids: file.block_ids.clone(),
             block_sizes,
-            size,
+            block_starts,
+            size: pos,
         })
     }
 
@@ -337,19 +343,24 @@ impl FileBlockReader {
     }
 
     fn find_start_block(&self, offset: u64) -> Option<(usize, usize)> {
-        let mut byte_idx = 0;
-
-        for block_idx in 0..self.block_ids.len() {
-            let this_size = self.block_sizes[block_idx];
-
-            if byte_idx + this_size > offset as usize {
-                return Some((block_idx, offset as usize - byte_idx));
-            }
-
-            byte_idx += this_size;
+        let offset = offset as usize;
+        let next_block_idx = bisection::bisect_right(&self.block_starts, &offset);
+        if next_block_idx == 0 {
+            return None;
         }
 
-        None
+        let block_idx = next_block_idx - 1;
+        let block_start = self.block_starts[block_idx];
+        assert!(offset >= block_start);
+
+        let block_offset = offset - block_start;
+
+        let block_size = self.block_sizes[block_idx];
+        if block_offset < block_size {
+            Some((block_idx, block_offset))
+        } else {
+            None
+        }
     }
 }
 
