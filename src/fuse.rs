@@ -172,7 +172,7 @@ impl PreFilesystem for SeafFuse {
     fn do_read(&mut self, ino: u64, offset: i64, size: u32) -> Result<Vec<u8>, c_int> {
         let id = self.lookup_id_by_ino(ino)?;
         let f = self.lib.file_by_id(id).map_err(|_e| EIO)?;
-        let mut fr = f.to_reader().map_err(|_e| EIO)?;
+        let mut fr = self.lib.file_reader(&f).map_err(|_e| EIO)?;
         let mut buf = vec![0; size as usize];
 
         // XXX Is it correct to cast to u64 here? Does negative offset mean something?

@@ -83,19 +83,13 @@ impl Library {
         full_obj_path(&self.location, ty, id)
     }
 
-    pub fn file_by_json(&self, file: &FileJson) -> File {
-        File {
-            location: self.location.clone(),
-            block_ids: file.block_ids.clone(),
-        }
+    pub fn file_by_id(&self, id: Sha1) -> Result<FileJson, SeafError> {
+        self.load_fs(id)?.try_file()
     }
 
-    pub fn file_by_id(&self, id: Sha1) -> Result<File, SeafError> {
-        let file = self.load_fs(id)?.try_file()?;
-        Ok(File {
-            location: self.location.clone(),
-            block_ids: file.block_ids,
-        })
+    pub fn file_reader(&self, file: &FileJson) -> Result<FileReader, SeafError> {
+        let fbr = FileBlockReader::new(file, self.location.clone())?;
+        Ok(FileReader::new(fbr))
     }
 }
 
@@ -106,21 +100,6 @@ fn full_obj_path(ll: &LibraryLocation, ty: &str, id: Sha1) -> PathBuf {
 
 fn obj_type_path(ll: &LibraryLocation, ty: &str) -> PathBuf {
     ll.repo_path.join(ty).join(&ll.uuid)
-}
-
-pub struct File {
-    location: Arc<LibraryLocation>,
-    block_ids: Vec<Sha1>,
-}
-
-impl File {
-    pub fn to_reader(self) -> Result<FileReader, SeafError> {
-        Ok(FileReader::new(self.into_block_reader()?))
-    }
-
-    fn into_block_reader(self) -> Result<FileBlockReader, SeafError> {
-        FileBlockReader::from_file(self)
-    }
 }
 
 #[derive(Debug)]
@@ -306,20 +285,20 @@ struct FileBlockReader {
 }
 
 impl FileBlockReader {
-    fn from_file(file: File) -> Result<FileBlockReader, SeafError> {
+    fn new(file: &FileJson, location: Arc<LibraryLocation>) -> Result<FileBlockReader, SeafError> {
         let mut block_sizes = vec![];
         let mut size = 0;
 
         for id in &file.block_ids {
-            let path = full_obj_path(&file.location, "blocks", *id);
+            let path = full_obj_path(&location, "blocks", *id);
             let md = fs::metadata(&path)?;
             block_sizes.push(md.len() as usize);
             size += md.len() as usize;
         }
 
         Ok(FileBlockReader {
-            location: file.location,
-            block_ids: file.block_ids,
+            location,
+            block_ids: file.block_ids.clone(),
             block_sizes,
             size,
         })

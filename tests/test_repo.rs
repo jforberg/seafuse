@@ -102,14 +102,11 @@ fn walk_lib_fs() {
 fn read_file_having_single_block() {
     let lib = TR_BASIC.open();
     let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
+    let f = lib.file_by_id(id).unwrap();
+    let mut fr = lib.file_reader(&f).unwrap();
     let mut bytes = vec![];
 
-    lib.file_by_id(id)
-        .unwrap()
-        .to_reader()
-        .unwrap()
-        .read_to_end(&mut bytes)
-        .unwrap();
+    fr.read_to_end(&mut bytes).unwrap();
 
     assert_eq!(&bytes, b"# test\n\ntest\n");
 }
@@ -118,14 +115,11 @@ fn read_file_having_single_block() {
 fn read_file_having_multiple_blocks() {
     let lib = TR_MULTIBLOCK.open();
     let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
+    let f = lib.file_by_id(id).unwrap();
+    let mut fr = lib.file_reader(&f).unwrap();
     let mut bytes = vec![];
 
-    lib.file_by_id(id)
-        .unwrap()
-        .to_reader()
-        .unwrap()
-        .read_to_end(&mut bytes)
-        .unwrap();
+    fr.read_to_end(&mut bytes).unwrap();
 
     assert_eq!(&bytes, b"gronkadonkachonka");
 }
@@ -134,12 +128,12 @@ fn read_file_having_multiple_blocks() {
 fn read_file_range() {
     let lib = TR_MULTIBLOCK.open();
     let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
+    let f = lib.file_by_id(id).unwrap();
+    let mut fr = lib.file_reader(&f).unwrap();
     let mut bytes = [0; 7];
 
-    let mut r = lib.file_by_id(id).unwrap().to_reader().unwrap();
-
-    r.seek(SeekFrom::Start(5)).unwrap();
-    let c = r.read(&mut bytes).unwrap();
+    fr.seek(SeekFrom::Start(5)).unwrap();
+    let c = fr.read(&mut bytes).unwrap();
 
     assert_eq!(c, 7);
     assert_eq!(&bytes, b"adonkac");
@@ -149,12 +143,12 @@ fn read_file_range() {
 fn read_empty_range() {
     let lib = TR_MULTIBLOCK.open();
     let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
+    let f = lib.file_by_id(id).unwrap();
+    let mut fr = lib.file_reader(&f).unwrap();
     let mut bytes = [];
 
-    let mut r = lib.file_by_id(id).unwrap().to_reader().unwrap();
-
-    r.seek(SeekFrom::Start(5)).unwrap();
-    let c = r.read(&mut bytes).unwrap();
+    fr.seek(SeekFrom::Start(5)).unwrap();
+    let c = fr.read(&mut bytes).unwrap();
 
     assert_eq!(c, 0);
 }
@@ -163,12 +157,12 @@ fn read_empty_range() {
 fn read_range_outside() {
     let lib = TR_MULTIBLOCK.open();
     let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();
+    let f = lib.file_by_id(id).unwrap();
+    let mut fr = lib.file_reader(&f).unwrap();
     let mut bytes = [0; 10];
 
-    let mut r = lib.file_by_id(id).unwrap().to_reader().unwrap();
-
-    r.seek(SeekFrom::Start(20)).unwrap();
-    let c = r.read(&mut bytes).unwrap();
+    fr.seek(SeekFrom::Start(20)).unwrap();
+    let c = fr.read(&mut bytes).unwrap();
 
     assert_eq!(c, 0);
 }
