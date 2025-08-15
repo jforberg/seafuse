@@ -80,6 +80,32 @@ fn walk_lib_fs() {
 }
 
 #[test]
+fn walk_prune_directory() {
+    let lib = TR_BASIC.open();
+
+    let mut it = lib.fs_iterator();
+    let (_path, de, _fs) = it.next().unwrap().unwrap();
+    assert_eq!(de.name, "somedir");
+
+    it.prune();
+    let (_path, de, _fs) = it.next().unwrap().unwrap();
+    assert_eq!(de.name, "test.md");
+
+    let r = it.next();
+    assert!(r.is_none());
+}
+
+#[test]
+fn walk_prune_root() {
+    let lib = TR_BASIC.open();
+    let mut it = lib.fs_iterator();
+    it.prune();
+
+    let r = it.next();
+    assert!(r.is_none());
+}
+
+#[test]
 fn read_file_having_single_block() {
     let lib = TR_BASIC.open();
     let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();

@@ -113,6 +113,7 @@ fn obj_type_path(ll: &LibraryLocation, ty: &str) -> PathBuf {
     ll.repo_path.join(ty).join(&ll.uuid)
 }
 
+/// A cursor for walking through the filesystem
 #[derive(Debug)]
 pub struct FsIterator<'a> {
     lib: &'a Library,
@@ -127,7 +128,12 @@ enum FsItState {
 
 #[derive(Debug)]
 struct FsItNrState {
+    /// Stack of directories "above" and including the current one. The last item is the current
+    /// directory. The dirents vector of each dir is successively mutated to remove each visited
+    /// dirent.
     stack: Vec<DirJson>,
+
+    /// Path to the current directory (the last item in `stack`)
     path: PathBuf,
 }
 
@@ -178,6 +184,25 @@ impl FsIterator<'_> {
         }
 
         Ok(None)
+    }
+
+    /// Stop walking the last/current directory and move one step up in the directory hierarchy
+    pub fn prune(&mut self) {
+        match &mut self.state {
+            FsItState::Root(_) => self.clear(),
+            FsItState::NotRoot(ref mut nr_state) => {
+                nr_state.stack.pop();
+                nr_state.path.pop();
+            }
+        }
+    }
+
+    /// Fast-forward to the end of the hierarchy.
+    pub fn clear(&mut self) {
+        self.state = FsItState::NotRoot(FsItNrState {
+            stack: vec![],
+            path: "".into(),
+        });
     }
 }
 
