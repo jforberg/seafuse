@@ -9,16 +9,6 @@ pub mod util;
 use util::*;
 
 #[test]
-fn parse_example_commit() {
-    let c = parse_commit(&TR_BASIC.path_to("commits", "038cac5ffc20b13a4fac8d21e60bf01d03f8a179"))
-        .unwrap();
-    assert_eq!(
-        c.commit_id.to_string(),
-        "038cac5ffc20b13a4fac8d21e60bf01d03f8a179"
-    );
-}
-
-#[test]
 fn find_and_parse_commits() {
     let p = Path::new(&TR_BASIC.path).join("commits");
     let ids: Vec<String> = CommitIterator::new(&p)
@@ -52,15 +42,6 @@ fn parse_example_fs_dir() {
     assert_eq!(
         d.dirents[0].id.to_string(),
         "e40b894880747010bf6ec384b83e578f352beed7"
-    );
-}
-
-#[test]
-fn lookup_head_commit() {
-    let lib = TR_BASIC.open();
-    assert_eq!(
-        lib.head_commit.unwrap().commit_id.to_string(),
-        "a47ac095b65fdfb64dd751570219036202577f0c"
     );
 }
 

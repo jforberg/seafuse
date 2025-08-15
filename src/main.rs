@@ -131,9 +131,8 @@ fn do_mount(source: &Path, uuid: &str, target: &Path) {
 
 fn do_stats(source: &Path, uuid: &str) {
     let lib = Library::open(source, uuid).unwrap();
-    let head_commit = lib.head_commit.as_ref().unwrap();
-    let head_commit_id = head_commit.commit_id;
-    let repo_name = &head_commit.repo_name;
+    let head_commit_id = lib.head_commit.commit_id;
+    let repo_name = &lib.head_commit.repo_name;
     println!("Head commit: {head_commit_id}");
     println!("Repo name: {repo_name}");
 

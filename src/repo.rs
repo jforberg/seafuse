@@ -1,5 +1,4 @@
 use flate2::read::ZlibDecoder;
-use log::debug;
 use serde::{Deserialize, Deserializer};
 use std::{
     cmp::min,
@@ -22,57 +21,42 @@ pub struct LibraryLocation {
 #[derive(Debug, Clone)]
 pub struct Library {
     pub location: Arc<LibraryLocation>,
-    pub head_commit: Option<CommitJson>,
+    pub head_commit: CommitJson,
 }
 
 impl Library {
     pub fn open(repo_path: &Path, uuid: &str) -> Result<Library, SeafError> {
-        Library::new(repo_path, uuid).populate()
+        let location = Arc::new(LibraryLocation {
+            repo_path: repo_path.to_path_buf(),
+            uuid: uuid.to_string(),
+        });
+        let head_commit = find_head_commit(&location)?;
+
+        Ok(Library {
+            location,
+            head_commit,
+        })
     }
 
-    fn new(repo_path: &Path, uuid: &str) -> Library {
-        Library {
-            location: Arc::new(LibraryLocation {
-                repo_path: repo_path.to_owned(),
-                uuid: uuid.to_owned(),
-            }),
-            head_commit: None,
-        }
-    }
+    pub fn open_for_commit(
+        repo_path: &Path,
+        uuid: &str,
+        commit_id: Sha1,
+    ) -> Result<Library, SeafError> {
+        let location = Arc::new(LibraryLocation {
+            repo_path: repo_path.to_path_buf(),
+            uuid: uuid.to_string(),
+        });
+        let head_commit = find_commit(&location, commit_id)?;
 
-    fn populate(mut self) -> Result<Library, SeafError> {
-        let mut head_commit: Option<CommitJson> = None;
-
-        // The head commit is assumed to be the most recent commit
-        for c in self.commit_iterator() {
-            let c = c?;
-
-            if let Some(ref hc) = head_commit {
-                if c.ctime > hc.ctime {
-                    head_commit = Some(c);
-                }
-            } else {
-                head_commit = Some(c);
-            }
-        }
-
-        self.head_commit = head_commit;
-        if self.head_commit.is_none() {
-            return Err(SeafError::NoHeadCommit);
-        }
-
-        if let Some(ref head) = self.head_commit {
-            debug!("Repo name: {}", head.repo_name);
-            debug!("Head commit: {}", head.commit_id);
-            debug!("Root: {}", head.root_id);
-            debug!("Last modified: {}, by {}", head.ctime, head.creator_name);
-        }
-
-        Ok(self)
+        Ok(Library {
+            location,
+            head_commit,
+        })
     }
 
     pub fn commit_iterator(&self) -> CommitIterator {
-        CommitIterator::new(&obj_type_path(&self.location, "commits"))
+        commit_iterator(&self.location)
     }
 
     pub fn load_fs(&self, id: Sha1) -> Result<FsJson, SeafError> {
@@ -95,6 +79,29 @@ impl Library {
         let fbr = FileBlockReader::new(file, self.location.clone())?;
         Ok(FileReader::new(fbr))
     }
+}
+
+fn find_head_commit(ll: &LibraryLocation) -> Result<CommitJson, SeafError> {
+    let mut head_commit: Option<CommitJson> = None;
+
+    // The head commit is assumed to be the most recent commit
+    for c in commit_iterator(ll) {
+        let c = c?;
+
+        if let Some(ref hc) = head_commit {
+            if c.ctime > hc.ctime {
+                head_commit = Some(c);
+            }
+        } else {
+            head_commit = Some(c);
+        }
+    }
+
+    head_commit.ok_or(SeafError::NoHeadCommit)
+}
+
+fn commit_iterator(ll: &LibraryLocation) -> CommitIterator {
+    CommitIterator::new(&obj_type_path(ll, "commits"))
 }
 
 fn full_obj_path(ll: &LibraryLocation, ty: &str, id: Sha1) -> PathBuf {
@@ -126,7 +133,7 @@ struct FsItNrState {
 
 impl FsIterator<'_> {
     pub fn new(lib: &Library) -> FsIterator<'_> {
-        let root_id = lib.head_commit.as_ref().unwrap().root_id;
+        let root_id = lib.head_commit.root_id;
 
         FsIterator {
             lib,
@@ -182,7 +189,12 @@ impl Iterator for FsIterator<'_> {
     }
 }
 
-pub fn parse_commit(filename: &Path) -> Result<CommitJson, SeafError> {
+fn find_commit(location: &LibraryLocation, id: Sha1) -> Result<CommitJson, SeafError> {
+    let path = full_obj_path(location, "commits", id);
+    parse_commit_file(&path)
+}
+
+fn parse_commit_file(filename: &Path) -> Result<CommitJson, SeafError> {
     let f = fs::File::open(filename)?;
     let c: CommitJson =
         serde_json::from_reader(f).map_err(|e| SeafError::ParseJson(filename.to_owned(), e))?;
@@ -214,7 +226,7 @@ impl Iterator for CommitIterator {
                         continue;
                     }
 
-                    return Some(parse_commit(de.path()));
+                    return Some(parse_commit_file(de.path()));
                 }
             }
         }

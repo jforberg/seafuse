@@ -60,7 +60,7 @@ pub trait PreFilesystem {
 
 impl SeafFuse {
     pub fn new(lib: Library) -> SeafFuse {
-        let root_id = lib.head_commit.as_ref().unwrap().root_id;
+        let root_id = lib.head_commit.root_id;
 
         SeafFuse {
             lib,
