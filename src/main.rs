@@ -5,6 +5,7 @@ use simple_logger::SimpleLogger;
 use std::cmp::{max, min};
 use std::fs;
 use std::io;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -28,6 +29,9 @@ enum Op {
 
         target: PathBuf,
 
+        #[arg(short = 'p', long)]
+        prefix: Option<PathBuf>,
+
         #[arg(short = 'n', long, default_value_t = false)]
         dry_run: bool,
     },
@@ -43,6 +47,13 @@ enum Op {
 
         uuid: String,
     },
+}
+
+#[derive(Debug)]
+enum PrefixMatch {
+    Yes,
+    No,
+    Continue,
 }
 
 fn main() {
@@ -65,8 +76,15 @@ fn main() {
             source,
             uuid,
             target,
+            prefix,
             dry_run,
-        } => do_extract(&source, &uuid, &target, dry_run),
+        } => do_extract(
+            &source,
+            &uuid,
+            &target,
+            &prefix.unwrap_or("".into()),
+            dry_run,
+        ),
         Op::Mount {
             source,
             uuid,
@@ -76,37 +94,65 @@ fn main() {
     };
 }
 
-fn do_extract(source: &Path, uuid: &str, target: &Path, dry_run: bool) {
+fn do_extract(source: &Path, uuid: &str, target: &Path, prefix: &Path, dry_run: bool) {
     let lib = Library::open(source, uuid).unwrap();
     let mut file_counter = 0;
     let mut dir_counter = 0;
 
     fs::create_dir_all(target).expect("Failed to create target directory");
 
-    for r in lib.fs_iterator() {
+    let mut it = lib.fs_iterator();
+    while let Some(r) = it.next() {
         let (p, de, fs) = r.expect("Failed to get fs entry");
+        let full_path = p.join(&de.name);
+        let target_path = target.join(full_path);
 
-        let full_parent = target.join(p);
-        let full_path = full_parent.join(&de.name);
+        match match_prefix(&prefix, &p) {
+            PrefixMatch::Yes => {}
+            PrefixMatch::No => {
+                debug!("Pruning directory {p:?}");
+                it.prune();
+                continue;
+            }
+            PrefixMatch::Continue => {
+                debug!("Ignoring directory {p:?}");
+                continue;
+            }
+        }
 
-        debug!("Extracted {}: {}", fs.type_name(), full_path.display());
+        debug!("Extracting {}: {}", fs.type_name(), target_path.display());
 
         if dry_run {
             continue;
         }
 
+        if let Some(parent) = target_path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+
         match fs {
             FsJson::Dir(_) => {
-                fs::create_dir(&full_path).unwrap_or_else(|e| {
-                    panic!("Failed to create new directory {:?}: {:?}", &full_path, e)
+                let r = match fs::create_dir(&target_path) {
+                    Err(e) => {
+                        if e.kind() == ErrorKind::AlreadyExists {
+                            Ok(())
+                        } else {
+                            Err(e)
+                        }
+                    }
+                    x => x,
+                };
+
+                r.unwrap_or_else(|e| {
+                    panic!("Failed to create new directory {:?}: {:?}", &target_path, e)
                 });
 
                 dir_counter += 1;
             }
             FsJson::File(f) => {
-                let path = full_parent.join(&de.name);
-                let mut w = fs::File::create_new(&path)
-                    .unwrap_or_else(|e| panic!("Failed to create new file {:?}: {:?}", &path, e));
+                let mut w = fs::File::create(&target_path).unwrap_or_else(|e| {
+                    panic!("Failed to create file {:?}: {:?}", &target_path, e)
+                });
                 let mut r = lib
                     .file_reader(&f)
                     .unwrap_or_else(|e| panic!("Failed to open file ({f:?}) for reading: {e:?}"));
@@ -119,6 +165,20 @@ fn do_extract(source: &Path, uuid: &str, target: &Path, dry_run: bool) {
     }
 
     println!("Extracted {dir_counter} directories, {file_counter} files");
+}
+
+fn match_prefix(pref: &Path, path: &Path) -> PrefixMatch {
+    let ret = if pref.as_os_str().is_empty() {
+        PrefixMatch::Yes
+    } else if path.starts_with(pref) {
+        PrefixMatch::Yes
+    } else if pref.starts_with(path) {
+        PrefixMatch::Continue
+    } else {
+        PrefixMatch::No
+    };
+
+    ret
 }
 
 fn do_mount(source: &Path, uuid: &str, target: &Path) {
