@@ -220,7 +220,7 @@ fn find_commit(location: &LibraryLocation, id: Sha1) -> Result<CommitJson, SeafE
 }
 
 fn parse_commit_file(filename: &Path) -> Result<CommitJson, SeafError> {
-    let f = fs::File::open(filename)?;
+    let f = fs::File::open(filename).map_err(|e| SeafError::IO(filename.to_owned(), e))?;
     let c: CommitJson =
         serde_json::from_reader(f).map_err(|e| SeafError::ParseJson(filename.to_owned(), e))?;
     Ok(c)
@@ -281,7 +281,7 @@ impl Read for FileReader {
                 self.byte_pos += s as u64;
                 Ok(s)
             }
-            Err(SeafError::IO(e)) => Err(e),
+            Err(SeafError::IO(_, e)) => Err(e),
             Err(e) => Err(io::Error::from(e)),
         }
     }
@@ -334,7 +334,7 @@ impl FileBlockReader {
 
         for id in &file.block_ids {
             let path = full_obj_path(&location, "blocks", *id);
-            let md = fs::metadata(&path)?;
+            let md = fs::metadata(&path).map_err(|e| SeafError::IO(path.to_owned(), e))?;
             let l = md.len() as usize;
 
             block_sizes.push(l);
@@ -364,10 +364,17 @@ impl FileBlockReader {
                         min(to_read - have_read, this_block_size - block_offset);
                     let file_path =
                         full_obj_path(&self.location, "blocks", self.block_ids[block_idx]);
-                    let mut file = fs::File::open(file_path)?;
 
-                    file.seek(SeekFrom::Start(block_offset as u64))?;
-                    file.read_exact(&mut buf[have_read..have_read + to_read_this_block])?;
+                    || -> Result<(), io::Error> {
+                        let mut file = fs::File::open(&file_path)?;
+
+                        file.seek(SeekFrom::Start(block_offset as u64))?;
+
+                        file.read_exact(&mut buf[have_read..have_read + to_read_this_block])?;
+
+                        Ok(())
+                    }()
+                    .map_err(|e| SeafError::IO(file_path.to_owned(), e))?;
 
                     have_read += to_read_this_block;
                     block_idx += 1;
@@ -483,7 +490,7 @@ impl FsJson {
 }
 
 pub fn parse_fs_json(filename: &Path) -> Result<FsJson, SeafError> {
-    let f = fs::File::open(filename)?;
+    let f = fs::File::open(filename).map_err(|e| SeafError::IO(filename.to_owned(), e))?;
     let dec = ZlibDecoder::new(f);
     let fs: FsJson =
         serde_json::from_reader(dec).map_err(|e| SeafError::ParseJson(filename.to_owned(), e))?;
@@ -541,18 +548,12 @@ impl<'de> Deserialize<'de> for Sha1 {
 
 #[derive(Debug)]
 pub enum SeafError {
-    IO(std::io::Error),
+    IO(PathBuf, std::io::Error),
     ParseJson(PathBuf, serde_json::Error),
     WalkDir(walkdir::Error),
     NotImpl,
     NoHeadCommit,
     WrongFsType,
-}
-
-impl From<std::io::Error> for SeafError {
-    fn from(e: std::io::Error) -> Self {
-        Self::IO(e)
-    }
 }
 
 impl From<SeafError> for io::Error {

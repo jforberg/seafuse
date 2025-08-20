@@ -107,7 +107,7 @@ fn do_extract(source: &Path, uuid: &str, target: &Path, prefix: &Path, dry_run: 
         let full_path = p.join(&de.name);
         let target_path = target.join(full_path);
 
-        match match_prefix(&prefix, &p) {
+        match match_prefix(prefix, &p) {
             PrefixMatch::Yes => {}
             PrefixMatch::No => {
                 debug!("Pruning directory {p:?}");
@@ -168,9 +168,7 @@ fn do_extract(source: &Path, uuid: &str, target: &Path, prefix: &Path, dry_run: 
 }
 
 fn match_prefix(pref: &Path, path: &Path) -> PrefixMatch {
-    let ret = if pref.as_os_str().is_empty() {
-        PrefixMatch::Yes
-    } else if path.starts_with(pref) {
+    let ret = if pref.as_os_str().is_empty() || path.starts_with(pref) {
         PrefixMatch::Yes
     } else if pref.starts_with(path) {
         PrefixMatch::Continue

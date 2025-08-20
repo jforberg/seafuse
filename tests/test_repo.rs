@@ -180,7 +180,7 @@ fn open_nonexistent_file() {
     let id = Sha1::parse("0000000000000000000000000000000000000000").unwrap();
 
     match lib.file_by_id(id) {
-        Err(SeafError::IO(e)) => assert_eq!(e.kind(), io::ErrorKind::NotFound),
+        Err(SeafError::IO(_, e)) => assert_eq!(e.kind(), io::ErrorKind::NotFound),
         _ => unreachable!(),
     };
 }
