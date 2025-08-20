@@ -60,7 +60,11 @@ impl Library {
     }
 
     pub fn load_fs(&self, id: Sha1) -> Result<FsJson, SeafError> {
-        parse_fs_json(&self.obj_path("fs", id))
+        if id == EMPTY_SHA1 {
+            Ok(FsJson::Dir(EMPTY_DIR_JSON))
+        } else {
+            parse_fs_json(&self.obj_path("fs", id))
+        }
     }
 
     pub fn fs_iterator(&self) -> FsIterator {
@@ -408,7 +412,7 @@ impl FileBlockReader {
     }
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct CommitJson {
     pub commit_id: Sha1,
     pub root_id: Sha1,
@@ -426,7 +430,7 @@ pub struct CommitJson {
     pub version: u32,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct FileJson {
     pub block_ids: Vec<Sha1>,
     pub size: u64,
@@ -435,7 +439,7 @@ pub struct FileJson {
     pub version: u32,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct DirJson {
     pub dirents: Vec<DirentJson>,
     #[serde(rename(deserialize = "type"))]
@@ -443,7 +447,9 @@ pub struct DirJson {
     pub version: u32,
 }
 
-#[derive(Debug, Deserialize, Clone)]
+const EMPTY_DIR_JSON: DirJson = DirJson { dirents: vec![], ty: 0, version: 0 };
+
+#[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct DirentJson {
     pub id: Sha1,
     pub mode: u32,
@@ -494,6 +500,7 @@ pub fn parse_fs_json(filename: &Path) -> Result<FsJson, SeafError> {
     let dec = ZlibDecoder::new(f);
     let fs: FsJson =
         serde_json::from_reader(dec).map_err(|e| SeafError::ParseJson(filename.to_owned(), e))?;
+
     Ok(fs)
 }
 
@@ -501,6 +508,8 @@ pub fn parse_fs_json(filename: &Path) -> Result<FsJson, SeafError> {
 pub struct Sha1 {
     words: [u32; 5],
 }
+
+const EMPTY_SHA1: Sha1 = Sha1 { words: [0; 5] };
 
 impl Sha1 {
     pub fn parse(hex: &str) -> Option<Sha1> {

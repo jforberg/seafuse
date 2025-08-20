@@ -111,7 +111,7 @@ fn do_extract(source: &Path, uuid: &str, target: &Path, prefix: &Path, dry_run: 
             PrefixMatch::Yes => {}
             PrefixMatch::No => {
                 debug!("Pruning directory {p:?}");
-                it.prune();
+                it.prune(); // XXX doesn't work properly
                 continue;
             }
             PrefixMatch::Continue => {

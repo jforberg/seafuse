@@ -29,3 +29,8 @@ pub const TR_MULTIBLOCK: TestRepo = TestRepo {
     path: "tests/testrepos/multiblock",
     uuid: "868be3a7-b357-4189-af52-304b402d9904",
 };
+
+pub const TR_EMPTY_DIR: TestRepo = TestRepo {
+    path: "tests/testrepos/empty_dir",
+    uuid: "868be3a7-b357-4189-af52-304b402d9904",
+};

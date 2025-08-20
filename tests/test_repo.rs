@@ -177,10 +177,18 @@ fn read_range_outside() {
 #[test]
 fn open_nonexistent_file() {
     let lib = TR_BASIC.open();
-    let id = Sha1::parse("0000000000000000000000000000000000000000").unwrap();
+    let id = Sha1::parse("1234123412341234123412341234123412341234").unwrap();
 
     match lib.file_by_id(id) {
         Err(SeafError::IO(_, e)) => assert_eq!(e.kind(), io::ErrorKind::NotFound),
         _ => unreachable!(),
     };
+}
+
+#[test]
+fn empty_root_dir() {
+    let lib = TR_EMPTY_DIR.open();
+
+    let dir = lib.load_fs(lib.head_commit.root_id).unwrap().unwrap_dir();
+    assert_eq!(dir.dirents, vec![]);
 }
