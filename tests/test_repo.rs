@@ -106,6 +106,32 @@ fn walk_prune_root() {
 }
 
 #[test]
+fn walk_prune_nested() {
+    let lib = TR_NESTED.open();
+    let mut it = lib.fs_iterator();
+    let mut selected_paths: HashSet<PathBuf> = HashSet::new();
+    let mut did_see_a = false;
+
+    while let Some(x) = it.next() {
+        let (path, de, _fs) = x.unwrap();
+        let path_is_a = de.name == "a";
+        let full_path = path.join(de.name);
+
+        assert!(!did_see_a || !path_is_a);
+
+        if path_is_a {
+            it.prune();
+            did_see_a = true;
+            continue;
+        }
+
+        selected_paths.insert(full_path);
+    }
+
+    assert_eq!(selected_paths, HashSet::from(["b", "b/b.md"].map(From::from)));
+}
+
+#[test]
 fn read_file_having_single_block() {
     let lib = TR_BASIC.open();
     let id = Sha1::parse("e40b894880747010bf6ec384b83e578f352beed7").unwrap();

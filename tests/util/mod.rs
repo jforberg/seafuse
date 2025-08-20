@@ -34,3 +34,8 @@ pub const TR_EMPTY_DIR: TestRepo = TestRepo {
     path: "tests/testrepos/empty_dir",
     uuid: "868be3a7-b357-4189-af52-304b402d9904",
 };
+
+pub const TR_NESTED: TestRepo = TestRepo {
+    path: "tests/testrepos/nested",
+    uuid: "66ece1b2-55ed-414a-b0ee-2550273b0d29",
+};
