@@ -49,7 +49,7 @@ enum Op {
     },
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum PrefixMatch {
     Yes,
     No,
@@ -240,4 +240,18 @@ fn format_unix_time(t: u64) -> String {
     let dt = DateTime::<Utc>::from(st);
 
     dt.to_rfc3339()
+}
+
+#[test]
+fn test_prefix_examples() {
+    assert_eq!(match_prefix(Path::new(""), Path::new("test/test2")), PrefixMatch::Yes);
+    assert_eq!(match_prefix(Path::new(""), Path::new("")), PrefixMatch::Yes);
+    assert_eq!(match_prefix(Path::new("test"), Path::new("")), PrefixMatch::Continue);
+
+    assert_eq!(match_prefix(Path::new("test"), Path::new("test/test2")), PrefixMatch::Yes);
+    assert_eq!(match_prefix(Path::new("test2"), Path::new("test")), PrefixMatch::No);
+    assert_eq!(match_prefix(Path::new("test2"), Path::new("test/test2")), PrefixMatch::No);
+    assert_eq!(match_prefix(Path::new("test/test2"), Path::new("test")), PrefixMatch::Continue);
+    assert_eq!(match_prefix(Path::new("test/test2"), Path::new("test/test2")), PrefixMatch::Yes);
+    assert_eq!(match_prefix(Path::new("test/test2"), Path::new("test/test")), PrefixMatch::No);
 }
