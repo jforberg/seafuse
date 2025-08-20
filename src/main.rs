@@ -1,3 +1,6 @@
+// Copyright 2025 Johan Förberg
+// SPDX-License-Identifier: MIT
+
 use chrono::{DateTime, Utc};
 use clap::Parser;
 use log::debug;

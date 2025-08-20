@@ -2,6 +2,7 @@
 name = "seafuse"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 bimap = "0.6.3"

@@ -1,3 +1,6 @@
+// Copyright 2025 Johan Förberg
+// SPDX-License-Identifier: MIT
+
 use flate2::read::ZlibDecoder;
 use serde::{Deserialize, Deserializer};
 use std::{

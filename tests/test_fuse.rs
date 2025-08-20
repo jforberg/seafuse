@@ -1,3 +1,6 @@
+// Copyright 2025 Johan Förberg
+// SPDX-License-Identifier: MIT
+
 use fuser::FUSE_ROOT_ID;
 use libc::{EBADF, ENOENT};
 use std::ffi::{OsStr, OsString};

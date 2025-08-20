@@ -1,3 +1,6 @@
+// Copyright 2025 Johan Förberg
+// SPDX-License-Identifier: MIT
+
 use std::collections::HashSet;
 use std::io;
 use std::io::{Read, Seek, SeekFrom};

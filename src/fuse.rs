@@ -1,3 +1,6 @@
+// Copyright 2025 Johan Förberg
+// SPDX-License-Identifier: MIT
+
 use bimap::BiMap;
 use core::time::Duration;
 use fuser::{
