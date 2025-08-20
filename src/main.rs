@@ -105,17 +105,17 @@ fn do_extract(source: &Path, uuid: &str, target: &Path, prefix: &Path, dry_run: 
     while let Some(r) = it.next() {
         let (p, de, fs) = r.expect("Failed to get fs entry");
         let full_path = p.join(&de.name);
-        let target_path = target.join(full_path);
+        let target_path = target.join(&full_path);
 
-        match match_prefix(prefix, &p) {
+        match match_prefix(prefix, &full_path) {
             PrefixMatch::Yes => {}
             PrefixMatch::No => {
-                debug!("Pruning directory {p:?}");
-                it.prune(); // XXX doesn't work properly
+                debug!("Pruning directory {full_path:?}");
+                it.prune();
                 continue;
             }
             PrefixMatch::Continue => {
-                debug!("Ignoring directory {p:?}");
+                debug!("Ignoring directory {full_path:?}");
                 continue;
             }
         }
