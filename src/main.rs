@@ -244,14 +244,38 @@ fn format_unix_time(t: u64) -> String {
 
 #[test]
 fn test_prefix_examples() {
-    assert_eq!(match_prefix(Path::new(""), Path::new("test/test2")), PrefixMatch::Yes);
+    assert_eq!(
+        match_prefix(Path::new(""), Path::new("test/test2")),
+        PrefixMatch::Yes
+    );
     assert_eq!(match_prefix(Path::new(""), Path::new("")), PrefixMatch::Yes);
-    assert_eq!(match_prefix(Path::new("test"), Path::new("")), PrefixMatch::Continue);
+    assert_eq!(
+        match_prefix(Path::new("test"), Path::new("")),
+        PrefixMatch::Continue
+    );
 
-    assert_eq!(match_prefix(Path::new("test"), Path::new("test/test2")), PrefixMatch::Yes);
-    assert_eq!(match_prefix(Path::new("test2"), Path::new("test")), PrefixMatch::No);
-    assert_eq!(match_prefix(Path::new("test2"), Path::new("test/test2")), PrefixMatch::No);
-    assert_eq!(match_prefix(Path::new("test/test2"), Path::new("test")), PrefixMatch::Continue);
-    assert_eq!(match_prefix(Path::new("test/test2"), Path::new("test/test2")), PrefixMatch::Yes);
-    assert_eq!(match_prefix(Path::new("test/test2"), Path::new("test/test")), PrefixMatch::No);
+    assert_eq!(
+        match_prefix(Path::new("test"), Path::new("test/test2")),
+        PrefixMatch::Yes
+    );
+    assert_eq!(
+        match_prefix(Path::new("test2"), Path::new("test")),
+        PrefixMatch::No
+    );
+    assert_eq!(
+        match_prefix(Path::new("test2"), Path::new("test/test2")),
+        PrefixMatch::No
+    );
+    assert_eq!(
+        match_prefix(Path::new("test/test2"), Path::new("test")),
+        PrefixMatch::Continue
+    );
+    assert_eq!(
+        match_prefix(Path::new("test/test2"), Path::new("test/test2")),
+        PrefixMatch::Yes
+    );
+    assert_eq!(
+        match_prefix(Path::new("test/test2"), Path::new("test/test")),
+        PrefixMatch::No
+    );
 }

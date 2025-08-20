@@ -447,7 +447,11 @@ pub struct DirJson {
     pub version: u32,
 }
 
-const EMPTY_DIR_JSON: DirJson = DirJson { dirents: vec![], ty: 0, version: 0 };
+const EMPTY_DIR_JSON: DirJson = DirJson {
+    dirents: vec![],
+    ty: 0,
+    version: 0,
+};
 
 #[derive(Debug, Deserialize, Clone, PartialEq)]
 pub struct DirentJson {

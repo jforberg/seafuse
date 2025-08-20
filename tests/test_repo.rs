@@ -128,7 +128,10 @@ fn walk_prune_nested() {
         selected_paths.insert(full_path);
     }
 
-    assert_eq!(selected_paths, HashSet::from(["b", "b/b.md"].map(From::from)));
+    assert_eq!(
+        selected_paths,
+        HashSet::from(["b", "b/b.md"].map(From::from))
+    );
 }
 
 #[test]
